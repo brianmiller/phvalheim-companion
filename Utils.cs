@@ -7,23 +7,50 @@ namespace PhValheimCompanion
 {
     public class Utils
     {
-        public static void PostMessage(string message, string username = null)
+        public static void PostDiscordMessage(string message, string username = null)
         {
-            Main.StaticLogger.LogMessage($"Posting message to webhook: {message}");
-            var httpWebRequest = (HttpWebRequest) WebRequest.Create(Main.Configuration.WebhookUrl.Value);
-            httpWebRequest.ContentType = "application/json";
-            httpWebRequest.Method = "POST";
+            Main.StaticLogger.LogMessage($"Posting message to Discord: {message}");
 
-            using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
+            var discordHttpWebRequest = (HttpWebRequest)WebRequest.Create(Main.Configuration.WebhookUrl.Value);
+            discordHttpWebRequest.ContentType = "application/json";
+            discordHttpWebRequest.Method = "POST";
+
+            using (var streamWriter = new StreamWriter(discordHttpWebRequest.GetRequestStream()))
             {
-                var body = new Dictionary<string, string> {{"content", message}};
+                var body = new Dictionary<string, string> { { "content", message } };
                 if (username != null) body.Add("username", username);
 
                 streamWriter.Write(JsonMapper.ToJson(body));
             }
 
-            httpWebRequest.GetResponseAsync();
+            discordHttpWebRequest.GetResponseAsync();
         }
+
+
+
+        public static void PostPhValheimBackendMessage(string message, string username = null)
+        {
+            Main.StaticLogger.LogMessage($"Posting message to PhValheim Backend: {message}");
+
+            var phvalheimHttpWebRequest = (HttpWebRequest)WebRequest.Create(Main.Configuration.PhValheimAdminApiUrl.Value);
+            phvalheimHttpWebRequest.ContentType = "application/json";
+            phvalheimHttpWebRequest.Method = "POST";
+
+            using (var streamWriter = new StreamWriter(phvalheimHttpWebRequest.GetRequestStream()))
+            {
+                var body = new Dictionary<string, string> { { "content", message } };
+                if (username != null) body.Add("username", username);
+
+                streamWriter.Write(JsonMapper.ToJson(body));
+            }
+
+            phvalheimHttpWebRequest.GetResponseAsync();
+
+        }
+
+
+
+
 
         public static string FetchIPAddress()
         {

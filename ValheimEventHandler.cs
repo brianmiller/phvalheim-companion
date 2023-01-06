@@ -25,7 +25,8 @@ namespace PhValheimCompanion
         {
             if (!Main.Configuration.Events[ValheimEvent.OnServerStarted].Value) return;
 
-            Utils.PostMessage(GetRandomMessage(Main.Configuration.messages.OnServerStart).Replace("{{serverAddress}}", ipAddress));
+            Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStart).Replace("{{serverAddress}}", ipAddress));
+            Utils.PostPhValheimBackendMessage(ipAddress);
         }
 
 
@@ -33,7 +34,7 @@ namespace PhValheimCompanion
         {
             if (!Main.Configuration.Events[ValheimEvent.OnServerStopped].Value) return;
 
-            Utils.PostMessage(GetRandomMessage(Main.Configuration.messages.OnServerStop));
+            Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStop));
         }
 
 
@@ -42,13 +43,11 @@ namespace PhValheimCompanion
             if (!Main.Configuration.Events[ValheimEvent.OnPlayerJoined].Value || playerInfo.m_characterID.IsNone()) return;
 
 
-            Utils.PostMessage(
-                GetRandomMessage(Main.Configuration.messages.OnPlayerJoined)
-                    .Replace("{{username}}", playerInfo.m_name)
-                    .Replace("{{userId}}", playerInfo.m_characterID.userID.ToString())
-            );
+            Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnPlayerJoined).Replace("{{username}}", playerInfo.m_name).Replace("{{userId}}", playerInfo.m_characterID.userID.ToString()));
 
-            Debug.Log("FOOOOOOOOOO" + playerInfo.m_name);
+
+            //Utils.PostPhValheimBackendMessage(playerInfo.m_name);
+            
 
         }
 
@@ -56,7 +55,7 @@ namespace PhValheimCompanion
         {
             if (!Main.Configuration.Events[ValheimEvent.OnPlayerDisconnected].Value || playerInfo.m_characterID.IsNone()) return;
 
-            Utils.PostMessage(
+            Utils.PostDiscordMessage(
                 GetRandomMessage(Main.Configuration.messages.OnPlayerDisconnect)
                     .Replace("{{username}}", playerInfo.m_name)
                     .Replace("{{userId}}", playerInfo.m_characterID.userID.ToString())
@@ -67,7 +66,7 @@ namespace PhValheimCompanion
         {
             if (!Main.Configuration.Events[ValheimEvent.OnPlayerDeath].Value || playerInfo.m_characterID.IsNone()) return;
 
-            Utils.PostMessage(
+            Utils.PostDiscordMessage(
                 GetRandomMessage(Main.Configuration.messages.OnPlayerDeath)
                     .Replace("{{username}}", playerInfo.m_name)
                     .Replace("{{userId}}", playerInfo.m_characterID.userID.ToString())
@@ -81,23 +80,23 @@ namespace PhValheimCompanion
                 case Talker.Type.Whisper:
                     if (!Main.Configuration.Events[ValheimEvent.OnPlayerWhisper].Value) return;
 
-                    Utils.PostMessage(message, $"{user} said");
+                    Utils.PostDiscordMessage(message, $"{user} said");
                     break;
                 case Talker.Type.Normal:
                     if (!Main.Configuration.Events[ValheimEvent.OnPlayerMessage].Value) return;
 
-                    Utils.PostMessage(message, $"{user} said");
+                    Utils.PostDiscordMessage(message, $"{user} said");
                     break;
                 case Talker.Type.Shout:
                     if (!Main.Configuration.Events[ValheimEvent.OnPlayerShout].Value) return;
                     if (Main.Configuration.UpperCaseShout.Value) message = message.ToUpper();
 
-                    Utils.PostMessage(message, $"{user} yelled");
+                    Utils.PostDiscordMessage(message, $"{user} yelled");
                     break;
                 case Talker.Type.Ping:
                     if (!Main.Configuration.Events[ValheimEvent.OnPlayerPing].Value) return;
 
-                    Utils.PostMessage($"Location: ({pos.x}x, {pos.y}y, {pos.z}z)", $"{user} pinged");
+                    Utils.PostDiscordMessage($"Location: ({pos.x}x, {pos.y}y, {pos.z}z)", $"{user} pinged");
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, null);
