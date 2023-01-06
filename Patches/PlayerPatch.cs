@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 
-namespace DiscordNotifier.Patches
+namespace PhValheimCompanion.Patches
 {
     internal class PlayerPatch
     {

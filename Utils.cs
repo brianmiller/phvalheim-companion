@@ -3,7 +3,7 @@ using System.IO;
 using System.Net;
 using LitJson;
 
-namespace DiscordNotifier
+namespace PhValheimCompanion
 {
     public class Utils
     {

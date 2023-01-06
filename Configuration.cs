@@ -6,7 +6,7 @@ using System.Text;
 using BepInEx.Configuration;
 using LitJson;
 
-namespace DiscordNotifier
+namespace PhValheimCompanion
 {
     public class Configuration
     {

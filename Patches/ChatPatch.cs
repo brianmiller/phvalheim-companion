@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DiscordNotifier.Patches
+namespace PhValheimCompanion.Patches
 {
     internal class ChatPatch
     {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace DiscordNotifier
+namespace PhValheimCompanion
 {
     public enum ValheimEvent
     {
@@ -47,6 +47,9 @@ namespace DiscordNotifier
                     .Replace("{{username}}", playerInfo.m_name)
                     .Replace("{{userId}}", playerInfo.m_characterID.userID.ToString())
             );
+
+            Debug.Log("FOOOOOOOOOO" + playerInfo.m_name);
+
         }
 
         public static void OnPlayerDisconnected(ZNet.PlayerInfo playerInfo)

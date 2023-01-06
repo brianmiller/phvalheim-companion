@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30517.126
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32421.90
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordNotifier", "DiscordNotifier.csproj", "{05078777-8B4C-43FD-98EC-887E0F886AAE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhValheimCompanion", "PhValheimCompanion.csproj", "{05078777-8B4C-43FD-98EC-887E0F886AAE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

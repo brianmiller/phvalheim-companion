@@ -4,15 +4,15 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 
-namespace DiscordNotifier
+namespace PhValheimCompanion
 {
     [BepInPlugin(GUID, MODNAME, VERSION)]
     public class Main : BaseUnityPlugin
     {
-        public const string MODNAME = "Discord Notifier";
-        public const string AUTHOR = "CryptikLemur";
-        public const string GUID = "CryptikLemur_DiscordNotifier";
-        public const string VERSION = "0.0.5.0";
+        public const string MODNAME = "PhValheim Companion";
+        public const string AUTHOR = "posixone";
+        public const string GUID = "posixone_PhValheimCompanion";
+        public const string VERSION = "1.0.0";
 
         internal static ManualLogSource StaticLogger;
 
