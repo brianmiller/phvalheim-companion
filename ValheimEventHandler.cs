@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -26,7 +27,19 @@ namespace PhValheimCompanion
             if (!Main.Configuration.Events[ValheimEvent.OnServerStarted].Value) return;
 
             Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStart).Replace("{{serverAddress}}", ipAddress));
-            Utils.PostPhValheimBackendMessage(ipAddress);
+
+
+            // PhValheim backend message for engine starting
+            World world = Utils.GetPrivateField<World>(WorldGenerator.instance, "m_world");
+            var Post = new PhValheimCompanion.JsonTemplates.PhValheimBackendPost_serverStarted()
+            {
+                action = "start",
+                world = world.m_name
+            };
+            var jsonPost = JsonConvert.SerializeObject(Post);
+            Utils.PostPhValheimBackendMessage(jsonPost);
+
+
         }
 
 
@@ -46,8 +59,17 @@ namespace PhValheimCompanion
             Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnPlayerJoined).Replace("{{username}}", playerInfo.m_name).Replace("{{userId}}", playerInfo.m_characterID.userID.ToString()));
 
 
-            //Utils.PostPhValheimBackendMessage(playerInfo.m_name);
-            
+            // PhValheim backend message for player join
+            World world = Utils.GetPrivateField<World>(WorldGenerator.instance, "m_world");
+            var Post = new PhValheimCompanion.JsonTemplates.PhValheimBackendPost_playerJoined()
+            {
+                action = "join",
+                world = world.m_name,
+                citizen = playerInfo.m_name
+            };
+            var jsonPost = JsonConvert.SerializeObject(Post);
+            Utils.PostPhValheimBackendMessage(jsonPost);
+
 
         }
 
