@@ -26,8 +26,8 @@ namespace PhValheimCompanion
         {
             if (!Main.Configuration.Events[ValheimEvent.OnServerStarted].Value) return;
 
+            //Send to Discord
             Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStart).Replace("{{serverAddress}}", ipAddress));
-
 
             // PhValheim backend message for engine starting
             World world = Utils.GetPrivateField<World>(WorldGenerator.instance, "m_world");

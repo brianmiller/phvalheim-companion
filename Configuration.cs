@@ -36,8 +36,7 @@ namespace PhValheimCompanion
         public readonly string messagesJsonPath;
         public readonly MessageStruct messages;
 
-        public readonly ConfigEntry<string> WebhookUrl;
-        public readonly ConfigEntry<string> PhValheimAdminApiUrl;
+        public readonly ConfigEntry<string> DiscordWebhookUrl;
         public readonly ConfigEntry<bool> Enabled;
         public readonly ConfigEntry<bool> FetchAndShowIp;
         public readonly ConfigEntry<string> RawIgnoredUsernames;
@@ -56,8 +55,7 @@ namespace PhValheimCompanion
 
             Enabled = config.Bind("General", "Enabled", true, "Is the plugin enabled?");
             FetchAndShowIp = config.Bind("General", "FetchAndShowIp", false, "Should the plugin attempt to get the server IP and post to the webhook");
-            WebhookUrl = config.Bind("General", "WebhookUrl", "", "Enter the Webhook URL from discord here.");
-            PhValheimAdminApiUrl = config.Bind("General", "PhValheimAdminApiUrl", "", "The URL to PhValheim's internal admin API.");
+            DiscordWebhookUrl = config.Bind("General", "WebhookUrl", "", "Enter the Webhook URL from discord here.");
             RawIgnoredUsernames = config.Bind("Chat", "IgnoredUsernames", "[]", "Array of ignored usernames. Comma separated. Use the format: Coralle, Steve");
             IgnoredChatMessageRegex = config.Bind("Chat", "IgnoredChatMessageRegex", "", "Specify a regex used to ignore chat messages.\nSyntax: /(^START)|(#END$)/\nThis would ignore text from the MapSync mod");
             UpperCaseShout = config.Bind("Chat", "UpperCaseShout", true, "Should /s messages be uppercased to match the in-game experience?");

@@ -1,8 +1,8 @@
 ﻿using System.Reflection;
 using BepInEx;
-using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+
 
 namespace PhValheimCompanion
 {
@@ -26,7 +26,8 @@ namespace PhValheimCompanion
             StaticLogger = Logger;
             Configuration = new Configuration(Config);
 
-            if (!Configuration.Enabled.Value || Configuration.WebhookUrl.Value.Length <= 0) return;
+            // if the this mod is disabled in the config, don't run
+            if (!Configuration.Enabled.Value) return;
 
             harmony.PatchAll(assembly);
             Logger.LogMessage($"{AUTHOR}'s {MODNAME} (v{VERSION}) has started");

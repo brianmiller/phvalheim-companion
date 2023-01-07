@@ -6,7 +6,8 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using LitJson;
-using Newtonsoft.Json;
+using UnityEngine;
+
 
 namespace PhValheimCompanion
 {
@@ -17,9 +18,12 @@ namespace PhValheimCompanion
 
         public static void PostDiscordMessage(string message, string username = null)
         {
+            // do not run if discord webhookurl is empty           
+            if (Main.Configuration.DiscordWebhookUrl.Value.Length <= 0) return;
+
             Main.StaticLogger.LogMessage($"Posting message to Discord: {message}");
 
-            var discordHttpWebRequest = (HttpWebRequest)WebRequest.Create(Main.Configuration.WebhookUrl.Value);
+            var discordHttpWebRequest = (HttpWebRequest)WebRequest.Create(Main.Configuration.DiscordWebhookUrl.Value);
             discordHttpWebRequest.ContentType = "application/json";
             discordHttpWebRequest.Method = "POST";
 
@@ -41,6 +45,22 @@ namespace PhValheimCompanion
             var endpoint = new Uri("http://127.0.0.1:8081/adminAPI.php");
             var payload = new StringContent(message, Encoding.UTF8, "application/json");
             var result = client.PostAsync(endpoint, payload).Result.Content.ReadAsStringAsync().Result;
+
+            Debug.Log("PhValheim Companion: [Sent] " + message);
+            if (result == "ack")
+            {
+                Debug.Log("PhValheim Companion: [Received] Backend response:OK");
+            }
+            else if(string.IsNullOrEmpty(result))
+            {
+                Debug.Log("PhValheim Companion: [Received] ERROR:The PhValheim backend didn't return a response.");
+            }
+            else
+            {
+                Debug.Log("PhValheim Companion: [Received] Backend response: " + result);
+            }
+
+
         }
 
 
