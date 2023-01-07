@@ -201,6 +201,7 @@ copy /Y "$(ProjectDir)\icon.png" "$(TargetDir)\PhValheimCompanion\"
 copy /Y "$(ProjectDir)\manifest.json" "$(TargetDir)\PhValheimCompanion\"
 copy /Y "$(TargetDir)$(ProjectName).dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
 copy /Y "$(TargetDir)LitJSON.dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
+copy /Y "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
 </PostBuildEvent>
   </PropertyGroup>
 </Project>
