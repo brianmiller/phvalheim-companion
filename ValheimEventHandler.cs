@@ -9,6 +9,7 @@ namespace PhValheimCompanion
     {
         OnServerStarted,
         OnServerStopped,
+        OnHungHead,
         OnPlayerJoined,
         OnPlayerDisconnected,
         OnPlayerDeath,
@@ -49,6 +50,39 @@ namespace PhValheimCompanion
 
             Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStop));
         }
+
+
+
+
+
+
+        public static void OnHungHead()
+        {
+            Main.StaticLogger.LogMessage("A head has been hung.................................................");
+
+            if (ZNet.instance.IsServer())
+            {
+                Main.StaticLogger.LogError("#### SERVER CODE DETECTED ####");
+            }
+            else
+            {
+                Main.StaticLogger.LogError("#### CLIENT CODE DETECTED ####");
+            }
+                
+            //int foo = GameObject.Find("BossStone_TheQueen*/itemstand/attach_trophie").transform.childCount;
+            //Main.StaticLogger.LogMessage("  Head state: " + foo);
+
+            //GameObject[] allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+            //foreach (object go in allObjects)
+            //    Main.StaticLogger.LogMessage(go);
+
+
+        }
+
+
+
+
+
 
 
         public static void OnPlayerJoined(ZNet.PlayerInfo playerInfo)

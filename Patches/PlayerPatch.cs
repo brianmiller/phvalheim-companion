@@ -1,10 +1,11 @@
 ﻿using HarmonyLib;
+using System.Linq.Expressions;
 
 namespace PhValheimCompanion.Patches
 {
     internal class PlayerPatch
     {
-        private static bool hasSpawned = false;
+        public static bool hasSpawned = false;
 
         private static ZNet.PlayerInfo getBasicPlayerInfoFromPlayer(Player player) => new ZNet.PlayerInfo
             {

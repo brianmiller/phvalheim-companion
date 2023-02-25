@@ -168,6 +168,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="phvalheim-backend.cs" />
+    <Compile Include="HungHeads.cs" />
     <Compile Include="JsonTemplates.cs" />
     <Compile Include="Configuration.cs" />
     <Compile Include="Main.cs" />

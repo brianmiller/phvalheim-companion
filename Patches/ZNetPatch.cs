@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using HarmonyLib;
+using UnityEngine;
 
 namespace PhValheimCompanion.Patches
 {
@@ -84,6 +86,7 @@ namespace PhValheimCompanion.Patches
         [HarmonyPatch(typeof(ZNet), "SendPeriodicData")]
         internal class SendPeriodicData
         {
+
             private static readonly List<long> DeadPlayers = new List<long>();
 
             private static ZNet.PlayerInfo GetPlayerInfo(ZNet __instance, ZDOID zdoId)
