@@ -10,9 +10,9 @@ namespace PhValheimCompanion
 {
     public class Configuration
     {
+        public static Uri phvalheimAdminApi = new Uri("http://127.0.0.1:8081/adminAPI.php");
+        public static Uri phvalheimPublicApi = new Uri(PhValheimBackend.GetPhValheimBackend() + "/api.php");
 
-        public string phvalheimAdminApi = "http://127.0.0.1:8081/adminAPI.php";
-        
         public static readonly string MessageStructComment = "Below is the configuration for the available messages you can send when the corresponding events happen in game.";
         public static readonly Dictionary<string, string[]> AvailableVariables = new Dictionary<string, string[]>
         {

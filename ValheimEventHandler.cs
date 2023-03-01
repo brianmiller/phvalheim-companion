@@ -38,7 +38,7 @@ namespace PhValheimCompanion
                 world = world.m_name
             };
             var jsonPost = JsonConvert.SerializeObject(Post);
-            Utils.PostPhValheimBackendMessage(jsonPost);
+            Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimAdminApi);
 
 
         }
@@ -50,39 +50,6 @@ namespace PhValheimCompanion
 
             Utils.PostDiscordMessage(GetRandomMessage(Main.Configuration.messages.OnServerStop));
         }
-
-
-
-
-
-
-        public static void OnHungHead()
-        {
-            Main.StaticLogger.LogMessage("A head has been hung.................................................");
-
-            if (ZNet.instance.IsServer())
-            {
-                Main.StaticLogger.LogError("#### SERVER CODE DETECTED ####");
-            }
-            else
-            {
-                Main.StaticLogger.LogError("#### CLIENT CODE DETECTED ####");
-            }
-                
-            //int foo = GameObject.Find("BossStone_TheQueen*/itemstand/attach_trophie").transform.childCount;
-            //Main.StaticLogger.LogMessage("  Head state: " + foo);
-
-            //GameObject[] allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
-            //foreach (object go in allObjects)
-            //    Main.StaticLogger.LogMessage(go);
-
-
-        }
-
-
-
-
-
 
 
         public static void OnPlayerJoined(ZNet.PlayerInfo playerInfo)
@@ -102,7 +69,7 @@ namespace PhValheimCompanion
                 citizen = playerInfo.m_name
             };
             var jsonPost = JsonConvert.SerializeObject(Post);
-            Utils.PostPhValheimBackendMessage(jsonPost);
+            Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimAdminApi);
 
 
         }

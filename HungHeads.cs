@@ -1,4 +1,6 @@
 ﻿using HarmonyLib;
+using Newtonsoft.Json;
+using System;
 using System.IO;
 
 namespace PhValheimCompanion
@@ -21,6 +23,16 @@ namespace PhValheimCompanion
                 {                    
                     Main.StaticLogger.LogMessage("Completed BossStone Detected: " + bossHead);
                     Main.StaticLogger.LogMessage("PhValheim Backend Detected: " + phvalheimBackend);
+                    
+                    // PhValheim backend message for head hung
+                    World world = Utils.GetPrivateField<World>(WorldGenerator.instance, "m_world");
+                    var Post = new PhValheimCompanion.JsonTemplates.PhValheimBackendPost_headHung()
+                    {
+                        action = bossHead,
+                        world = world.m_name
+                    };
+                    var jsonPost = JsonConvert.SerializeObject(Post);
+                    Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimPublicApi);
                 }
                 else
                 {

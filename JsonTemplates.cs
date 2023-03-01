@@ -15,5 +15,13 @@
             public string world { get; set; }
             public string citizen { get; set; }
         }
+
+        public class PhValheimBackendPost_headHung
+        {
+            public string action { get; set; }
+            public string world { get; set; }
+        }
+
+
     }
 }

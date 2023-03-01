@@ -34,33 +34,33 @@ namespace PhValheimCompanion
 
                 streamWriter.Write(JsonMapper.ToJson(body));
             }
-
             discordHttpWebRequest.GetResponseAsync();
         }
+        
 
-
-        public static void PostPhValheimBackendMessage(string message)
+        public static void PostPhValheimBackendMessage(string jsonMessage, Uri endpoint)
         {
             using var client = new HttpClient();
-            var endpoint = new Uri("http://127.0.0.1:8081/adminAPI.php");
-            var payload = new StringContent(message, Encoding.UTF8, "application/json");
-            var result = client.PostAsync(endpoint, payload).Result.Content.ReadAsStringAsync().Result;
+            var payload = new StringContent(jsonMessage, Encoding.UTF8, "application/json");
+            string result = client.PostAsync(endpoint, payload).Result.Content.ReadAsStringAsync().Result;
 
-            Debug.Log("PhValheim Companion: [Sent] " + message);
-            if (result == "ack")
+            Debug.Log("PhValheim Companion: [Sent] " + jsonMessage);
+            if (result == "true")
             {
-                Debug.Log("PhValheim Companion: [Received] Backend response:OK");
+                Debug.Log("PhValheim Companion: [Received] Backend response: OK");
+            }
+            else if(result == "false")
+            {
+                Debug.Log("PhValheim Companion: [Received] Backend response: FAIL");
             }
             else if(string.IsNullOrEmpty(result))
             {
-                Debug.Log("PhValheim Companion: [Received] ERROR:The PhValheim backend didn't return a response.");
+                Debug.Log("PhValheim Companion: [Received] ERROR: The PhValheim backend didn't return a response. Make sure your PhValheim Server is up-to-date.");
             }
             else
             {
                 Debug.Log("PhValheim Companion: [Received] Backend response: " + result);
             }
-
-
         }
 
 
