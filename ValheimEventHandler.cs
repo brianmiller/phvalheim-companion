@@ -39,8 +39,6 @@ namespace PhValheimCompanion
             };
             var jsonPost = JsonConvert.SerializeObject(Post);
             Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimAdminApi);
-
-
         }
 
 

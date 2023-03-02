@@ -28,5 +28,6 @@ See https://github.com/brianmiller/phvalheim-server for more information regardi
 
 ## Changelog
 
+- 1.0.2 Corrected a URI issue with unused (as of now) server-side code.
 - 1.0.1 A significant and new capability was added to phvalheim-client, phvalheim-server and phvalheim-companion, allowing in-game client notifications to be sent back to the originating PhValheim server. The first feature that uses this new method detects world progression. E.g., When a boss head is hung at the spawn shrines, PhValheim Server will now display icons on the public interface indicating progression.
 - 1.0.0 Initial release sends world start and player join to the backend.
