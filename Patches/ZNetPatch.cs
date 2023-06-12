@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
+
 
 namespace PhValheimCompanion.Patches
 {
@@ -44,6 +47,13 @@ namespace PhValheimCompanion.Patches
                 if (peer.m_characterID.IsNone() || !ZNet.instance.IsServer() || !__instance.IsConnected(peer.m_uid) || ConnectedPlayers.Contains(peer.m_characterID.userID)) return;
                 ConnectedPlayers.Add(peer.m_characterID.userID);
 
+
+                //UnityEngine.Debug.Log("foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo");
+                //peerSocket = peer.m_rpc.m_socket;
+                //UnityEngine.Debug.Log(__instance.LocalIPAddress());
+                //UnityEngine.Debug.Log(peerSocket);
+
+
                 ValheimEventHandler.OnPlayerJoined(GetPlayerInfoFromPeer(peer));
             }
         }
@@ -80,47 +90,6 @@ namespace PhValheimCompanion.Patches
                 if (!__instance.IsServer()) return;
 
                 ValheimEventHandler.OnServerStopped();
-            }
-        }
-
-        [HarmonyPatch(typeof(ZNet), "SendPeriodicData")]
-        internal class SendPeriodicData
-        {
-
-            private static readonly List<long> DeadPlayers = new List<long>();
-
-            private static ZNet.PlayerInfo GetPlayerInfo(ZNet __instance, ZDOID zdoId)
-            {
-                return __instance.GetPlayerList().Find(player => player.m_characterID.userID == zdoId.userID);
-            }
-
-            private static void Process(ZNet __instance, ZDOID zdoID)
-            {
-                if (zdoID.IsNone()) return;
-
-                var zdo = ZDOMan.instance.GetZDO(zdoID);
-                if (zdo == null) return;
-
-                var dead = zdo.GetBool("dead", false);
-
-                // If dead, and not in deadPlayers, add to deadPlayers and create event
-                // If dead, and in deadPlayers, do nothing
-                // If not dead, and in deadPlayers, remove
-                // If not dead, and not in deadPlayers, do nothing
-                if (dead)
-                {
-                    if (DeadPlayers.Contains(zdoID.userID)) return;
-                    DeadPlayers.Add(zdoID.userID);
-                    ValheimEventHandler.OnPlayerDeath(GetPlayerInfo(__instance, zdoID));
-                }
-                else if (DeadPlayers.Contains(zdoID.userID)) DeadPlayers.Remove(zdoID.userID);
-            }
-
-            private static void Prefix(ref ZNet __instance)
-            {
-                if (!__instance.IsServer()) return;
-
-                foreach (var cur in __instance.m_peers.Where(cur => cur.IsReady())) Process(__instance, cur.m_characterID);
             }
         }
     }

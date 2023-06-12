@@ -64,7 +64,10 @@ namespace PhValheimCompanion
             {
                 action = "join",
                 world = world.m_name,
-                citizen = playerInfo.m_name
+                citizen = playerInfo.m_name,
+                steamid = playerInfo.m_host,
+                //clientip = playerInfo.
+
             };
             var jsonPost = JsonConvert.SerializeObject(Post);
             Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimAdminApi);

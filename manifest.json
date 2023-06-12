@@ -1,9 +1,9 @@
 ﻿{
   "name": "PhValheimCompanion",
   "description": "Connects client and server events to PhValheim's backend (phvalheim-server)",
-  "version_number": "1.0.2",
+  "version_number": "1.0.3",
   "website_url": "https://github.com/brianmiller/phvalheim-companion",
   "dependencies": [
-    "denikson-BepInExPack_Valheim-5.4.1901"
+    "denikson-BepInExPack_Valheim-5.4.2105"
   ]
 }
