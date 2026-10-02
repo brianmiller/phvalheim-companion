@@ -1,212 +1,140 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 2.53 rebuild.
+       The original project file was a legacy (non-SDK) MSBuild project whose every HintPath
+       was an absolute Windows path into a Steam install and a roaming PhValheim world
+       directory. None of those resolve on a build host, so the mod could only ever be built
+       on one particular Windows desktop.
+
+       References now resolve from ./libs, which mirrors the layout phvalheim-tickmonitor and
+       thorskist already use on this box. Populate it with ./refresh-libs.sh. -->
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{05078777-8B4C-43FD-98EC-887E0F886AAE}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>PhValheimCompanion</RootNamespace>
+    <TargetFramework>net472</TargetFramework>
     <AssemblyName>PhValheimCompanion</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Deterministic>true</Deterministic>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <RootNamespace>PhValheimCompanion</RootNamespace>
+    <Authors>posixone</Authors>
+    <Version>1.0.4</Version>
+    <Description>Connects PhValheim client and server events to the PhValheim backend</Description>
     <LangVersion>8.0</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>none</DebugType>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <LangVersion>8.0</LangVersion>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <PropertyGroup>
-    <RunPostBuildEvent>Always</RunPostBuildEvent>
-  </PropertyGroup>
+
+  <!-- Compile set is explicit, not globbed.
+       The 2.53 rewrite removes the upstream valheim-discord-notifier code this was forked
+       from, and an implicit glob would silently pull a deleted-but-not-yet-removed file back
+       into the build. Listing them means the compile set is reviewable in a diff. -->
   <ItemGroup>
-    <Reference Include="0Harmony_publicized">
-      <HintPath>..\..\..\..\AppData\Roaming\PhValheim\worlds\phvalheim.phospher.com\test1\test1\BepInEx\core\publicized_assemblies\0Harmony_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="Assembly-CSharp_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\Assembly-CSharp_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_googleanalytics_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_googleanalytics_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_guiutils_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_guiutils_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_lux_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_lux_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_postprocessing_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_postprocessing_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_simplemeshcombine_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_simplemeshcombine_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_steamworks_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_steamworks_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_sunshafts_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_sunshafts_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_utils_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_utils_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="assembly_valheim_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\assembly_valheim_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="BepInEx.Preloader_publicized">
-      <HintPath>..\..\..\..\AppData\Roaming\PhValheim\worlds\phvalheim.phospher.com\test1\test1\BepInEx\core\publicized_assemblies\BepInEx.Preloader_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="BepInEx_publicized">
-      <HintPath>..\..\..\..\AppData\Roaming\PhValheim\worlds\phvalheim.phospher.com\test1\test1\BepInEx\core\publicized_assemblies\BepInEx_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="HarmonyXInterop_publicized">
-      <HintPath>..\..\..\..\AppData\Roaming\PhValheim\worlds\phvalheim.phospher.com\test1\test1\BepInEx\core\publicized_assemblies\HarmonyXInterop_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="LitJSON, Version=0.17.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\LitJson.0.17.0\lib\net45\LitJSON.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>packages\Newtonsoft.Json.13.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
-    <Reference Include="UnityEngine.AIModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.AIModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AndroidJNIModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.AndroidJNIModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AnimationModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.AnimationModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AssetBundleModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.AssetBundleModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AudioModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.AudioModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.ClothModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.ClothModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.CoreModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.DirectorModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.DirectorModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.GridModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.GridModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.IMGUIModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.InputLegacyModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.InputModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.InputModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.ParticleSystemModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.ParticleSystemModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.Physics2DModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.Physics2DModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.PhysicsModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.PhysicsModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.ScreenCaptureModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.ScreenCaptureModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.SharedInternalsModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.SharedInternalsModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.SpriteShapeModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.SpriteShapeModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.SubsystemsModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.SubsystemsModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TerrainModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.TerrainModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TextRenderingModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.TextRenderingModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TilemapModule_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.TilemapModule_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.UI_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine.UI_publicized.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine_publicized">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\UnityEngine_publicized.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="phvalheim-backend.cs" />
-    <Compile Include="HungHeads.cs" />
-    <Compile Include="JsonTemplates.cs" />
-    <Compile Include="Configuration.cs" />
     <Compile Include="Main.cs" />
-    <Compile Include="Patches\ChatPatch.cs" />
-    <Compile Include="Patches\PlayerPatch.cs" />
-    <Compile Include="Patches\ZNetPatch.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="HungHeads.cs" />
+    <Compile Include="phvalheim-backend.cs" />
     <Compile Include="Utils.cs" />
-    <Compile Include="ValheimEventHandler.cs" />
+    <Compile Include="LaunchPayload.cs" />
+    <Compile Include="ConnectDialog.cs" />
+    <Compile Include="ModListView.cs" />
+    <Compile Include="ConnectFlow.cs" />
+    <Compile Include="JoinSentry.cs" />
+    <Compile Include="Patches/FejdStartupPatch.cs" />
+    <Compile Include="Properties/AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="manifest.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Include="packages.config" />
-    <None Include="README.md" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include=".gitignore" />
-    <Content Include="icon.png" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PreBuildEvent>rmdir /s /q "$(TargetDir)\PhValheimCompanion"</PreBuildEvent>
-  </PropertyGroup>
-  <PropertyGroup>
-    <PostBuildEvent>mkdir "$(TargetDir)\PhValheimCompanion"
-mkdir "$(TargetDir)\PhValheimCompanion\PhValheimCompanion"
-copy /Y "$(ProjectDir)\README.md" "$(TargetDir)\PhValheimCompanion\"
-copy /Y "$(ProjectDir)\icon.png" "$(TargetDir)\PhValheimCompanion\"
-copy /Y "$(ProjectDir)\manifest.json" "$(TargetDir)\PhValheimCompanion\"
-copy /Y "$(TargetDir)$(ProjectName).dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
-copy /Y "$(TargetDir)LitJSON.dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
-copy /Y "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)\PhValheimCompanion\PhValheimCompanion\"
 
-cd "$(TargetDir)\PhValheimCompanion\
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
 
-tar -a -cf "$(TargetDir)\PhValheimCompanion.zip" "*"</PostBuildEvent>
-  </PropertyGroup>
+  <!-- Referenced explicitly because the type is forwarded on net472 and does not come in
+       with the framework reference alone. Utils.PostPhValheimBackendMessage needs it. -->
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <!-- BepInEx + Harmony -->
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>libs/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>libs/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Valheim.
+       assembly_valheim_publicized is the PUBLICIZED assembly. It is what lets this compile
+       against private members such as ItemStand.m_supportedItems. It also compiles green and
+       throws at runtime if a member was private for a reason, so a successful build here is
+       NOT evidence the mod works. A real client smoke test is the only oracle. -->
+  <ItemGroup>
+    <Reference Include="assembly_valheim">
+      <HintPath>libs/assembly_valheim_publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_utils">
+      <HintPath>libs/assembly_utils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_guiutils">
+      <HintPath>libs/assembly_guiutils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Splatform">
+      <HintPath>libs/Splatform.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Unity -->
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>libs/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>libs/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>libs/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>libs/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>libs/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>libs/UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>libs/UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>libs/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>libs/UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>libs/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="netstandard">
+      <HintPath>libs/netstandard.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
 </Project>

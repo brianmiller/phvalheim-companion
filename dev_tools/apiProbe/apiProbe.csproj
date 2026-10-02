@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Why this exists.
+       The Companion compiles against assembly_valheim_publicized.dll, where every member is
+       public. That means a call to a member that does not exist AT ALL still fails at build
+       time, but a call with the wrong SIGNATURE, or to a member Valheim renamed between
+       versions, is exactly the kind of thing that compiles green and throws in front of a
+       player. This tool reads the real metadata and prints the signature, so the code can be
+       written against what is in the binary rather than what the wiki remembers.
+
+       Run it with dev_tools/probe.sh, which carries a control: it also asks for a member that
+       is known NOT to exist. If the probe cannot tell those two cases apart it is not a probe,
+       it is a rubber stamp. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>apiProbe</AssemblyName>
+    <RootNamespace>apiProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

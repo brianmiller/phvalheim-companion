@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using Newtonsoft.Json;
 using System;
 using System.IO;
 
@@ -26,13 +25,8 @@ namespace PhValheimCompanion
                     
                     // PhValheim backend message for head hung
                     World world = Utils.GetPrivateField<World>(WorldGenerator.instance, "m_world");
-                    var Post = new PhValheimCompanion.JsonTemplates.PhValheimBackendPost_headHung()
-                    {
-                        action = bossHead,
-                        world = world.m_name
-                    };
-                    var jsonPost = JsonConvert.SerializeObject(Post);
-                    Utils.PostPhValheimBackendMessage(jsonPost, Configuration.phvalheimPublicApi);
+                    var jsonPost = Utils.HeadHungJson(bossHead, world.m_name);
+                    Utils.PostPhValheimBackendMessage(jsonPost, PhValheimBackend.PublicApiUri());
                 }
                 else
                 {

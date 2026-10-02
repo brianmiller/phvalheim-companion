@@ -350,3 +350,15 @@ MigrationBackup/
 .ionide/
 
 Libs
+
+# --- PhValheim 2.53 -----------------------------------------------------------------
+# Reference assemblies. NEVER COMMIT THESE.
+#
+# libs/ holds Valheim, Unity and BepInEx DLLs copied off a game install. They are
+# Iron Gate's and Unity's property, and this repository is PUBLIC. Populate the
+# directory locally with ./refresh-libs.sh instead.
+libs/
+
+# Legacy non-SDK project leftovers
+*.sln
+*.sln.legacy
