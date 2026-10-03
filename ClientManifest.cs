@@ -45,7 +45,6 @@ namespace PhValheimCompanion
         public bool IsVanilla { get; private set; }
         public bool IsCrossplay { get; private set; }
         public string MinClientVersion { get; private set; }
-        public string ClientUrl { get; private set; }
 
         private static bool _loaded;
         private static ClientManifest _current;
@@ -122,9 +121,10 @@ namespace PhValheimCompanion
 
         // Internal so a harness can parse a manifest without a game or a filesystem.
         //
-        // Split on the FIRST '=' only. clientUrl is a URL and carries its own '=' signs in its
-        // query string; splitting on every one of them truncated it to the scheme in the first
-        // draft, which is the kind of bug that looks like a server-side typo.
+        // Split on the FIRST '=' only. No field we read today contains an '=', but a world name
+        // may, and splitting on every one would silently truncate it -- a notice titled with
+        // half a world name reads like a server-side typo. The rule is kept and asserted
+        // rather than narrowed to the fields that happen to exist now.
         internal static ClientManifest FromLines(string[] lines, string sourceForLogs)
         {
             if (lines == null) return null;
@@ -160,7 +160,6 @@ namespace PhValheimCompanion
                 IsVanilla = Get(kv, "vanilla") == "1",
                 IsCrossplay = Get(kv, "crossplay") == "1",
                 MinClientVersion = Get(kv, "minClientVersion"),
-                ClientUrl = Get(kv, "clientUrl"),
             };
 
             return m;

@@ -166,7 +166,6 @@ namespace RenderDialog
                 {
                     "world=Midgard", "host=valheim.example.com", "port=25003",
                     "vanilla=0", "crossplay=0", "minClientVersion=2.0.14",
-                    "clientUrl=https://phv.example.com/download?os=win&v=2",
                 });
 
             // A crossplay world has no address. The body must not print one, and must say what
@@ -177,7 +176,6 @@ namespace RenderDialog
                 {
                     "world=JustStarted", "host=valheim.example.com", "port=25004",
                     "vanilla=0", "crossplay=1", "minClientVersion=2.0.14",
-                    "clientUrl=https://phv.example.com/download",
                 });
 
             failures += RenderHelp(asm, dialog, "LAUNCH HELP: worst case long name",
@@ -186,13 +184,12 @@ namespace RenderDialog
                     "world=AVeryLongWorldNameThatSomebodyWillAbsolutelyUse",
                     "host=a-rather-long-hostname.someones-homelab.example.com", "port=25999",
                     "vanilla=0", "crossplay=0", "minClientVersion=2.0.14",
-                    "clientUrl=https://phv.example.com/download?os=win&v=2",
                 });
 
             // A manifest written by a server that did not set the version. The sentence about
             // app versions is dropped rather than printed with a blank in it.
             failures += RenderHelp(asm, dialog, "LAUNCH HELP: no minClientVersion in the manifest",
-                new[] { "world=Bare", "host=h.example.com", "port=25000", "clientUrl=" });
+                new[] { "world=Bare", "host=h.example.com", "port=25000" });
 
             failures += ManifestParserChecks(asm);
 
@@ -430,12 +427,12 @@ namespace RenderDialog
             failures += Expect("parser", parse(new[] { "world=W" }) != null,
                 "accepts a manifest that does name a world");
 
-            // The URL keeps its query string. Splitting on every '=' truncated this to
-            // "https://h/dl?os" in the first draft -- a value that still looks like a URL,
-            // which is exactly why it needs asserting rather than eyeballing.
-            var urly = parse(new[] { "world=W", "clientUrl=https://h/dl?os=win&v=2" });
-            failures += Expect("parser", str(urly, "ClientUrl") == "https://h/dl?os=win&v=2",
-                $"keeps a URL containing '=' whole (got \"{str(urly, "ClientUrl")}\")");
+            // A value containing .=. survives whole. No field we read today has one, but a
+            // WORLD NAME may, and splitting on every .=. would title the notice with half a
+            // name -- which reads like a server-side typo rather than a parser bug.
+            var eqy = parse(new[] { "world=Odin=Thor" });
+            failures += Expect("parser", str(eqy, "World") == "Odin=Thor",
+                $"splits on the FIRST .=. only (got \"{str(eqy, "World")}\")");
 
             // Comments and blank lines are skipped rather than parsed into junk keys.
             var commented = parse(new[] { "# written by phvalheim", "", "world=W", "port=25000" });

@@ -138,6 +138,21 @@ namespace PhValheimCompanion
         private Vector2 _savedLeftPos, _savedRightPos;
         private bool _buttonsStyled;
 
+        // The launch-help notice has ONE action, so its left button is hidden rather than
+        // given a second job.
+        //
+        // It used to offer "Get the app", opening settings.phvalheimClientURL -- which is a
+        // single URL for a setting whose default has pointed at a Windows .exe since 2.31.
+        // On Linux or macOS that button hands the player the wrong installer, and picking the
+        // right one per platform is a problem the server cannot solve from one text field.
+        // Brian's call: drop it.
+        //
+        // Restored in RestorePopupSkin like every other change made here. This is the shared
+        // UnifiedPopup singleton: a left button left inactive would vanish from every later
+        // yes/no dialog in the game, which is a worse bug than the one being fixed.
+        private bool _leftButtonHidden;
+        private bool _savedLeftActive;
+
         // Rect geometry, saved separately from the text styling above: these move Valheim's own
         // layout, so a missed restore is the most visible leak of the lot.
         private Vector2 _savedHeaderPos;
@@ -345,27 +360,27 @@ namespace PhValheimCompanion
             var manifest = ClientManifest.Current;
             if (manifest == null) return;
 
-            var haveUrl = !string.IsNullOrEmpty(manifest.ClientUrl);
-
             try
             {
-                // Left button offers the client download when there is a URL to offer. With no
-                // URL both buttons just close -- an "update" button that goes nowhere is worse
-                // than no button, and the body text still names the world and the address.
-                ApplyPopupSkin(yesLabel: "Close", noLabel: haveUrl ? "Get the app" : "Close");
+                // One action, one button. Both slots are wired to OnClose because YesNoPopup
+                // demands two callbacks; the left one is then hidden below, after the push.
+                ApplyPopupSkin(yesLabel: "Close", noLabel: "Close");
 
                 UnifiedPopup.Push(new YesNoPopup(
                     "PhValheim",
                     BuildLaunchHelpBody(manifest),
-                    OnClose,                              // yes slot -> right button -> "Close"
-                    // PopupButtonCallback, not Action: YesNoPopup's own delegate type, and a
-                    // conditional of two method groups needs the target type named explicitly.
-                    haveUrl ? (PopupButtonCallback)OnGetClient : OnClose,
+                    OnClose,     // yes slot -> right button -> "Close"
+                    OnClose,     // no  slot -> left  button -> hidden
                     false,
                     true));
 
                 ApplyChromeStyle();
                 ApplyBodyStyle();
+
+                // AFTER the push, for the same reason ApplyBodyStyle is: the panel's objects
+                // are not live until the popup is active, and reaching for buttonLeft before
+                // that silently finds nothing and leaves both buttons on screen.
+                HideLeftButton();
             }
             catch (Exception e)
             {
@@ -375,24 +390,26 @@ namespace PhValheimCompanion
             }
         }
 
-        private void OnGetClient()
+        // Hide the left button of the shared popup, remembering what it was.
+        //
+        // Failure is logged, not thrown: the notice with two Close buttons is untidy, while a
+        // notice that did not appear is the bug this whole feature exists to fix.
+        private void HideLeftButton()
         {
-            var manifest = ClientManifest.Current;
-
-            Pop();
-            RestorePopupSkin();
-            _closedByPlayer = true;
-
             try
             {
-                Application.OpenURL(manifest.ClientUrl);
-                Main.StaticLogger.LogMessage($"Opened {manifest.ClientUrl} in the browser.");
+                var popup = PopupInstance();
+                if (popup == null) return;
+                if (!Utils.TryGetFieldValue(popup, "buttonLeft", out var lBtn)) return;
+                if (!(lBtn is Button buttonLeft) || buttonLeft.gameObject == null) return;
+
+                _savedLeftActive = buttonLeft.gameObject.activeSelf;
+                _leftButtonHidden = true;
+                buttonLeft.gameObject.SetActive(false);
             }
             catch (Exception e)
             {
-                // Named in the log rather than swallowed: a player who clicked and saw nothing
-                // happen needs the address from somewhere, and the log is where it is.
-                Main.StaticLogger.LogWarning($"Could not open the browser ({e.GetType().Name}). Get the PhValheim app from {manifest.ClientUrl}");
+                Main.StaticLogger.LogWarning($"Dialog layout: could not hide the unused left button ({e.GetType().Name}); it will read \"Close\" as well.");
             }
         }
 
@@ -682,6 +699,20 @@ namespace PhValheimCompanion
         private void RestorePopupSkin()
         {
             var popup = PopupInstance();
+
+            // FIRST, and unconditionally once set. Everything else here is cosmetic; a left
+            // button left inactive disappears from every later yes/no dialog in the game --
+            // including vanilla's own -- which is a worse fault than the one it was hidden for.
+            if (_leftButtonHidden)
+            {
+                _leftButtonHidden = false;
+                if (popup != null
+                    && Utils.TryGetFieldValue(popup, "buttonLeft", out var hidden)
+                    && hidden is Button leftBtn && leftBtn.gameObject != null)
+                {
+                    leftBtn.gameObject.SetActive(_savedLeftActive);
+                }
+            }
 
             if (_labelsOverridden)
             {

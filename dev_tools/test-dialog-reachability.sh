@@ -116,6 +116,26 @@ check ConnectDialog.OnGUI 'ClientManifest.get_Present' \
 	"after Close, a help-mode player would have no button to reopen the notice"
 
 echo
+echo "== the unused left button is hidden, AND put back =="
+
+check ConnectDialog.ShowLaunchHelp 'ConnectDialog.HideLeftButton' \
+	"the notice would show two buttons both labelled Close"
+check ConnectDialog.HideLeftButton 'SetActive' \
+	"nothing would actually hide it"
+
+# THE DANGEROUS HALF. UnifiedPopup is a shared singleton: a left button left inactive is gone
+# from every later yes/no dialog in the game, vanilla's included. The hide is cosmetic; a
+# missing restore is a game-wide fault, so it is asserted separately from the hide.
+check ConnectDialog.RestorePopupSkin 'SetActive' \
+	"MISSING RESTORE: the left button would stay hidden on every later popup in the game"
+
+# NEGATIVE: the download button is gone. settings.phvalheimClientURL is a single url whose
+# default has been a Windows .exe since 2.31, so on Linux or macOS it handed the player the
+# wrong installer. Brian's call to drop it; this stops it being quietly reintroduced.
+notcheck ConnectDialog.ShowLaunchHelp 'OpenURL' \
+	"a single client url cannot be right for every platform -- the button was removed"
+
+echo
 echo "== controls: the manifest must NOT have leaked everywhere =="
 
 # If every method consulted the manifest, the checks above would pass for a build in which the
