@@ -431,7 +431,8 @@ namespace PhValheimCompanion
             {
                 // The dialog is the convenience, not the product. If it cannot be shown the
                 // player still has a working game and a server list.
-                Main.StaticLogger.LogError($"Could not show the connect dialog ({e.GetType().Name}: {e.Message}). Join \"{payload.World}\" from the server list at {payload.Host}:{payload.Port}.");
+                Main.StaticLogger.LogError($"Could not show the connect dialog: {e}");
+                Main.StaticLogger.LogError($"Join \"{payload.World}\" from the server list at {payload.Host}:{payload.Port}.");
                 ModListView.Destroy();
                 RestorePopupSkin();
                 _closedByPlayer = true;
@@ -502,7 +503,13 @@ namespace PhValheimCompanion
             }
             catch (Exception e)
             {
-                Main.StaticLogger.LogError($"Could not show the launch-help notice ({e.GetType().Name}: {e.Message}). To join \"{manifest.World}\", start it from the PhValheim app.");
+                // The STACK, not just the type and message. This catch is the one remaining
+                // explanation for "the button does nothing": it logs, sets _closedByPlayer and
+                // so puts the button straight back, which from outside is indistinguishable
+                // from a click that never landed. Type+message alone does not say which of the
+                // ~dozen reflected reads in the styling chain failed; the stack does.
+                Main.StaticLogger.LogError($"Could not show the launch-help notice: {e}");
+                Main.StaticLogger.LogError($"To join \"{manifest.World}\", start it from the PhValheim app.");
                 RestorePopupSkin();
                 _closedByPlayer = true;
             }
