@@ -30,6 +30,7 @@
        from, and an implicit glob would silently pull a deleted-but-not-yet-removed file back
        into the build. Listing them means the compile set is reviewable in a diff. -->
   <ItemGroup>
+    <Compile Include="Theme.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="HungHeads.cs" />
     <Compile Include="phvalheim-backend.cs" />

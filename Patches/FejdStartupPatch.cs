@@ -12,7 +12,7 @@ namespace PhValheimCompanion.Patches
         {
             static void Postfix(ref FejdStartup __instance)
             {
-                __instance.m_versionLabel.text += $"\n<size=6><color=#ADB2FFFF>{Main.AUTHOR}'s {Main.MODNAME} v{Main.VERSION}</color></size>";
+                __instance.m_versionLabel.text += $"\n<size=6><color={Theme.Button}>{Main.AUTHOR}'s {Main.MODNAME} v{Main.VERSION}</color></size>";
 
                 // The connect dialog is attached here rather than shown here. SetupGui runs
                 // while the menu is still being built, and UnifiedPopup is not accepting

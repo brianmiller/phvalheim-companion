@@ -177,6 +177,13 @@ check ConnectDialog.RestorePopupSkin 'ConnectDialog._savedOkText' \
 check ConnectDialog.ApplyOkLabel 'ConnectDialog.ScalePanel' \
 	"the notice would be drawn in the connect dialog's much larger panel"
 
+# The title is tinted to PhValheim's accent, and UnifiedPopup is shared -- left behind, every
+# later popup in the session has a cyan title, vanilla's "Remove this character?" included.
+# Anchored on the saved field, which nothing else reads, rather than on a set_color call that
+# the tint itself would also satisfy.
+check ConnectDialog.RestorePopupSkin 'ConnectDialog._savedHeaderColor' \
+	"MISSING RESTORE: the themed title colour would leak onto every later popup in the session"
+
 # NEGATIVE: the download button is gone. settings.phvalheimClientURL is a single url whose
 # default has been a Windows .exe since 2.31, so on Linux or macOS it handed the player the
 # wrong installer. Brian's call to drop it; this stops it being quietly reintroduced.

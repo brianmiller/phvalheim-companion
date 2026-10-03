@@ -150,11 +150,21 @@ namespace PhValheimCompanion
         {
             try
             {
+                Color themed;
+                bool themeOk = ColorUtility.TryParseHtmlString(Theme.Button, out themed);
                 // Both text kinds. Valheim's menu buttons are TMP, but a clone that picked up a
                 // legacy Text somewhere would otherwise keep the template's own wording -- a
                 // button reading "Start Game" that opens our notice is worse than no button.
-                foreach (var t in go.GetComponentsInChildren<TMP_Text>(true)) t.text = label;
-                foreach (var t in go.GetComponentsInChildren<Text>(true)) t.text = label;
+                foreach (var t in go.GetComponentsInChildren<TMP_Text>(true))
+                {
+                    t.text = label;
+                    if (themeOk) t.color = themed;
+                }
+                foreach (var t in go.GetComponentsInChildren<Text>(true))
+                {
+                    t.text = label;
+                    if (themeOk) t.color = themed;
+                }
             }
             catch (Exception e)
             {

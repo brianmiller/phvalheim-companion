@@ -284,7 +284,7 @@ namespace PhValheimCompanion
                 // Angle brackets stripped for the same reason as everywhere else: mod names are
                 // operator data landing in a rich-text field.
                 string name = mods[i] == null ? "" : mods[i].Replace('<', ' ').Replace('>', ' ');
-                sb.Append("<color=#9AA3B8>  • ").Append(name).Append("</color>");
+                sb.Append("<color=").Append(Theme.Muted).Append(">  • ").Append(name).Append("</color>");
                 if (i < mods.Count - 1) sb.Append('\n');
             }
             return sb.ToString();

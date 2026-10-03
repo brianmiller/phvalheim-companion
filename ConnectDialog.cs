@@ -185,6 +185,7 @@ namespace PhValheimCompanion
         private float _savedHeaderFontSize;
         private bool _savedHeaderAutoSize;
         private bool _headerStyled;
+        private Color _savedHeaderColor;
         private float _savedLeftTextSize, _savedRightTextSize;
         private bool _savedLeftAutoSize, _savedRightAutoSize;
         private Vector3 _savedLeftScale, _savedRightScale;
@@ -817,9 +818,16 @@ namespace PhValheimCompanion
             {
                 _savedHeaderFontSize = header.fontSize;
                 _savedHeaderAutoSize = header.enableAutoSizing;
+                _savedHeaderColor = header.color;
                 _headerStyled = true;
                 header.enableAutoSizing = false;
                 header.fontSize = HeaderScreenSize / _activeScale;
+
+                // The title in PhValheim's accent, which is the strongest identity cue the
+                // panel has -- the rest of the art is Valheim's. Saved and put back with
+                // everything else: left behind, every later popup in the session would have a
+                // cyan title, vanilla's "Remove this character?" included.
+                if (ColorUtility.TryParseHtmlString(ColHighlight, out var accent)) header.color = accent;
 
                 // Lift the title toward the top edge. +y is up in Unity UI regardless of how the
                 // rect is anchored, so this does not depend on knowing the prefab's anchors.
@@ -1021,6 +1029,7 @@ namespace PhValheimCompanion
                 {
                     header.fontSize = _savedHeaderFontSize;
                     header.enableAutoSizing = _savedHeaderAutoSize;
+                    header.color = _savedHeaderColor;
                 }
             }
 
@@ -1085,9 +1094,18 @@ namespace PhValheimCompanion
         // Colours picked to sit with Valheim's parchment-on-dark popup rather than fight it:
         // a warm highlight for the world name, muted grey-blue for secondary lines, amber for
         // the one case the player needs to act on.
-        private const string ColHighlight = "#E8D9A0";   // world name, join code
-        private const string ColMuted     = "#9AA3B8";   // secondary text
-        private const string ColWarn      = "#FFC083";   // no mods found
+        // PHVALHEIM'S OWN PALETTE, copied from container/nginx/www/css/phvalheimStyles.css.
+        //
+        // These were Valheim-parchment colours picked by eye (#E8D9A0 cream, #FFC083 peach),
+        // which looked native in the game and like nothing else in the product. The dialog is
+        // PhValheim's voice inside Valheim, so it uses PhValheim's accents.
+        //
+        // The CSS variable each one comes from is named deliberately:
+        // dev_tools/test-client-manifest.sh re-reads :root and fails if these drift from it,
+        // so re-theming the web UI cannot silently leave the in-game dialog behind.
+        private const string ColHighlight = Theme.Accent;
+        private const string ColMuted     = Theme.Muted;
+        private const string ColWarn      = Theme.Warn;
 
         // Where the value column starts, as a percentage of the body width. TMP's <pos> is what
         // makes this a table rather than a paragraph: every value lands on the same x no matter
