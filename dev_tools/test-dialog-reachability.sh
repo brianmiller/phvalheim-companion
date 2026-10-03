@@ -123,6 +123,30 @@ notcheck ConnectDialog.OnGUI 'ConnectDialog.Show' \
 	"pushing from OnGUI has no retry: a dropped push leaves the player with no way back"
 
 echo
+echo "== the way back is a REAL menu button =="
+
+# The IMGUI button drew correctly -- the log has its exact rect -- and never received a click.
+# A cloned uGUI Button gets clicks through whatever input path the game itself uses.
+check ConnectDialog.Update 'ConnectDialog.ManageReopenButton' \
+	"nothing would create or remove the button"
+check ConnectDialog.ManageReopenButton 'MenuButton.Ensure' \
+	"the native button would never be created, leaving only the unclickable drawn one"
+check MenuButton.Ensure 'Instantiate' \
+	"nothing is cloned, so there is no button"
+
+# THE DANGEROUS ONE. The template is a LIVE Valheim menu button with its own handler attached.
+# Left in place, our clone also runs whatever that button does -- Start Game, for instance.
+check MenuButton.Ensure 'RemoveAllListeners' \
+	"the clone would keep Valheim's own handler and do two things at once"
+check MenuButton.Ensure 'AddListener' \
+	"the clone would be inert"
+
+# The clone lives on the CANVAS, not on the menu object, so it outlives this component unless
+# it is explicitly destroyed -- a stale button into the next main menu with a dead callback.
+check ConnectDialog.OnDestroy 'MenuButton.Remove' \
+	"the clone would survive into the next main menu"
+
+echo
 echo "== one button, centred by the game, and every override put back =="
 
 # WarningPopup, not YesNoPopup. UnifiedPopup.ShowWarning activates buttonCenter and centres

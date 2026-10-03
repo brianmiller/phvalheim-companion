@@ -248,6 +248,13 @@ namespace PhValheimCompanion
                 return;
             }
 
+            // THE WAY BACK, handled before the early return below -- that return is taken on
+            // exactly the frames when the button should be on screen.
+            //
+            // A real uGUI button, cloned from Valheim's own menu, because the IMGUI one drew
+            // correctly and never received a click. See MenuButton for the evidence.
+            ManageReopenButton();
+
             if (_shown || _closedByPlayer) return;
 
             // WHY THIS LOGS.
@@ -287,6 +294,8 @@ namespace PhValheimCompanion
             }
 
             NoteDecline(null);
+            MenuButton.Remove();
+            _nativeButtonOk = false;
             _shown = true;
             Show();
         }
@@ -301,6 +310,67 @@ namespace PhValheimCompanion
         // and ignoring clicks from a button that was never drawn at all. Those two need
         // completely different fixes, so the log has to separate them.
         private bool _buttonDrawReported;
+
+        // Whether the native button is up. When it cannot be created, OnGUI's drawn button is
+        // still offered -- it is useless for clicking on this client, but on a build where
+        // IMGUI input works it is better than nothing, and it costs one branch.
+        private bool _nativeButtonOk;
+
+        private void ManageReopenButton()
+        {
+            bool wanted = _closedByPlayer && !ConnectFlow.Connecting && !_shown;
+
+            if (wanted)
+            {
+                try
+                {
+                    if (FejdStartup.instance == null || UnifiedPopup.IsVisible()) wanted = false;
+                }
+                catch
+                {
+                    wanted = false;
+                }
+            }
+
+            if (wanted && !IsMainMenuActive()) wanted = false;
+
+            if (!wanted)
+            {
+                MenuButton.Remove();
+                _nativeButtonOk = false;
+                return;
+            }
+
+            var world = LaunchPayload.Present
+                ? LaunchPayload.Current.World
+                : (ClientManifest.Present ? ClientManifest.Current.World : "");
+
+            // "Connect to X" only where connecting is actually possible. The notice has no
+            // password, so in that mode the button opens the notice and says so.
+            var label = LaunchPayload.Present ? $"Connect to {world}" : $"PhValheim: {world}";
+
+            _nativeButtonOk = MenuButton.Ensure(label, OnReopenRequested);
+        }
+
+        // Shared by the native button and the IMGUI fallback, so both routes behave the same.
+        // Clears _shown rather than calling Show(): UnifiedPopup silently drops a push it is
+        // not ready for, and Update() retries until IsReadyToShow() says yes.
+        private void OnReopenRequested()
+        {
+            _closedByPlayer = false;
+            _shown = false;
+            _lastDecline = "__clicked__";
+            MenuButton.Remove();
+            _nativeButtonOk = false;
+        }
+
+        // The menu's GameObject is destroyed on the way into a world, and this component with
+        // it -- but the clone lives on the CANVAS, so it has to be taken down explicitly or it
+        // would survive into the next main menu with a dead callback behind it.
+        private void OnDestroy()
+        {
+            MenuButton.Remove();
+        }
 
         private void NoteDecline(string reason)
         {
@@ -1269,6 +1339,10 @@ namespace PhValheimCompanion
             // Either mode can be reopened. The gate used to be LaunchPayload.Present alone,
             // which was right when that was the only reason the dialog existed; with the
             // launch-help notice it would have left that player's only route back missing.
+            // Only when the native button could not be made. On this client IMGUI draws but
+            // never receives the click, so a second visible button would be a decoy.
+            if (_nativeButtonOk) return;
+
             if (!_closedByPlayer || ConnectFlow.Connecting) return;
             if (!LaunchPayload.Present && !ClientManifest.Present) return;
 
@@ -1313,10 +1387,8 @@ namespace PhValheimCompanion
                 // Clearing _shown instead lets Update() show it on a frame when
                 // IsReadyToShow() actually says yes, which is the path that puts the dialog up
                 // in the first place and the only one proven to work.
-                Main.StaticLogger.LogMessage("PhValheim button clicked; handing the dialog to Update().");
-                _closedByPlayer = false;
-                _shown = false;
-                _lastDecline = "__clicked__";   // force the next decline to log, whatever it is
+                Main.StaticLogger.LogMessage("PhValheim drawn button clicked; handing the dialog to Update().");
+                OnReopenRequested();
             }
         }
     }
