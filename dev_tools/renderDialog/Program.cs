@@ -211,6 +211,7 @@ namespace RenderDialog
                 new[] { "world=Bare", "host=h.example.com", "port=25000" });
 
             failures += ScaleBudgetRelation(dialog);
+            failures += NudgeInvariance(dialog);
             failures += ManifestParserChecks(asm);
 
             Console.WriteLine(failures == 0
@@ -503,6 +504,58 @@ namespace RenderDialog
 
             return Expect("relation", ok,
                 $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
+        }
+
+        // A POSITION NUDGE MUST NOT CHANGE WITH THE PANEL SCALE.
+        //
+        // Fonts divide by the active scale so they come out the same screen size in either
+        // panel. Nudges must not: divided the same way, 60/1.5 = 40 local units against
+        // 60/2.0 = 30, so the smaller panel gets the BIGGER shove and the header is pushed out
+        // of the top of it. That shipped -- Brian saw the title half outside the box the moment
+        // the notice shrank.
+        //
+        // These are offsets in the panel's own local space, which is identical at every scale,
+        // so the correct local value is a constant. That is arithmetic, so it can be checked
+        // here with no game: call each helper at both scales and require the same answer.
+        private static int NudgeInvariance(Type dialog)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- position nudges are scale-invariant ---");
+
+            FieldInfo ps = dialog.GetField("PanelScale", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo hps = dialog.GetField("HelpPanelScale", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (ps == null || hps == null)
+            {
+                Console.WriteLine("    FAIL  PanelScale or HelpPanelScale not found.");
+                return 1;
+            }
+
+            float panel = (float)ps.GetRawConstantValue();
+            float help = (float)hps.GetRawConstantValue();
+
+            // CONTROL: if the two scales were equal, every comparison below would pass for a
+            // build whose nudges scale wrongly. The whole check rests on them differing.
+            int failures = Expect("nudges", Math.Abs(panel - help) > 0.001f,
+                $"the two panel scales actually differ ({panel} vs {help})");
+
+            foreach (string name in new[] { "HeaderLiftLocal", "BodyLiftLocal", "ButtonPullLocal" })
+            {
+                MethodInfo m = dialog.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                if (m == null)
+                {
+                    Console.WriteLine($"    FAIL  {name} not found -- the nudge arithmetic is untested again; fix this, do not delete it.");
+                    failures++;
+                    continue;
+                }
+
+                float atPanel = (float)m.Invoke(null, new object[] { panel });
+                float atHelp = (float)m.Invoke(null, new object[] { help });
+
+                failures += Expect("nudges", Math.Abs(atPanel - atHelp) < 0.001f,
+                    $"{name} is the same in both panels ({atPanel:0.##} vs {atHelp:0.##})");
+            }
+
+            return failures;
         }
 
         private static int Expect(string label, bool ok, string what)

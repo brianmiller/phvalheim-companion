@@ -148,6 +148,27 @@ namespace PhValheimCompanion
         private const float BodyLiftScreen   = 110f;
         private const float ButtonPullScreen = 70f;
 
+        // THESE THREE ARE POSITIONS, NOT SIZES, AND THEY SCALE DIFFERENTLY FROM FONTS.
+        //
+        // A font is divided by the ACTIVE scale, so the same screen size comes out of either
+        // panel -- that is what makes the text legible in both. A nudge must not work that way.
+        // Divided by the active scale it becomes a LARGER local offset in a SMALLER panel:
+        // 60/1.5 = 40 local units against 60/2.0 = 30. That shoved the header up out of the top
+        // of the 1.5 panel, which is exactly what Brian saw the moment the notice shrank.
+        //
+        // These are offsets inside the panel's own local space, and that space is identical at
+        // every scale -- only the factor it is drawn at differs. So the local offset is a
+        // constant, pinned to PanelScale, and the on-screen distance comes out proportional to
+        // whatever panel it is in: 30 local is 60px at 2.0 and 45px at 1.5, the same fraction
+        // of the panel either way.
+        //
+        // Exposed so dev_tools/renderDialog can assert the invariance rather than trust this
+        // comment: a nudge that changes with the scale is the bug, and it is arithmetic, so it
+        // can be checked without a game.
+        internal static float HeaderLiftLocal(float activeScale) => HeaderLiftScreen / PanelScale;
+        internal static float BodyLiftLocal(float activeScale)   => BodyLiftScreen / PanelScale;
+        internal static float ButtonPullLocal(float activeScale) => ButtonPullScreen / PanelScale;
+
         // Readable at 1080p and up, and deliberately a constant rather than a percentage --
         // see ApplyPopupSkin for why percentages of Valheim's own body size were unreadable.
         // Runtime, not const: it depends on which panel is being laid out. As a const it was
@@ -674,7 +695,7 @@ namespace PhValheimCompanion
                     _savedHeaderPos = header.rectTransform.anchoredPosition;
                     _headerMoved = true;
                     header.rectTransform.anchoredPosition =
-                        _savedHeaderPos + new Vector2(0f, HeaderLiftScreen / _activeScale);
+                        _savedHeaderPos + new Vector2(0f, HeaderLiftLocal(_activeScale));
                 }
             }
             else
@@ -746,7 +767,7 @@ namespace PhValheimCompanion
                 {
                     _savedLeftPos = lRect.anchoredPosition;
                     _savedRightPos = rRect.anchoredPosition;
-                    float pull = ButtonPullScreen / _activeScale;
+                    float pull = ButtonPullLocal(_activeScale);
                     lRect.anchoredPosition = _savedLeftPos + new Vector2(pull, 0f);
                     rRect.anchoredPosition = _savedRightPos + new Vector2(-pull, 0f);
                 }
@@ -775,7 +796,7 @@ namespace PhValheimCompanion
                 _savedBodySize = br.sizeDelta;
                 _bodyMoved = true;
 
-                float lift = BodyLiftScreen / _activeScale;
+                float lift = BodyLiftLocal(_activeScale);
                 br.sizeDelta = _savedBodySize + new Vector2(0f, lift);
                 br.anchoredPosition = _savedBodyPos + new Vector2(0f, lift * 0.5f);
 
@@ -1212,9 +1233,19 @@ namespace PhValheimCompanion
 
             if (GUI.Button(rect, label))
             {
+                // Hand it to Update() instead of calling Show() here.
+                //
+                // This used to set _shown = true and push immediately, which had no retry in
+                // it: UnifiedPopup silently drops a push it is not ready to accept, and with
+                // _shown already true Update() would never try again. The player clicked and
+                // nothing happened, for good -- Brian's report on the older-client path, where
+                // reopening is the only way back to the notice.
+                //
+                // Clearing _shown instead lets Update() show it on a frame when
+                // IsReadyToShow() actually says yes, which is the path that puts the dialog up
+                // in the first place and the only one proven to work.
                 _closedByPlayer = false;
-                _shown = true;
-                Show();
+                _shown = false;
             }
         }
     }

@@ -115,6 +115,13 @@ echo "== the way back is reachable in both modes =="
 check ConnectDialog.OnGUI 'ClientManifest.get_Present' \
 	"after Close, a help-mode player would have no button to reopen the notice"
 
+# NEGATIVE, and this one shipped broken. OnGUI used to call Show() directly and set _shown,
+# which has no retry in it: UnifiedPopup silently drops a push it is not ready for, and with
+# _shown already true Update() never tried again. The player clicked and nothing happened, for
+# good. Reopening must go through Update() -> IsReadyToShow(), the path that works.
+notcheck ConnectDialog.OnGUI 'ConnectDialog.Show' \
+	"pushing from OnGUI has no retry: a dropped push leaves the player with no way back"
+
 echo
 echo "== one button, centred by the game, and every override put back =="
 
