@@ -56,6 +56,55 @@ namespace PhValheimCompanion
         // was lost precisely because the log said what the code intended.
         private static bool _described;
 
+        // EVERY LOG CALL IN THIS CLASS IS ON A PER-FRAME PATH. That is the whole reason the
+        // next three fields exist, and getting it wrong once was expensive.
+        //
+        // ManageReopenButton calls Ensure on EVERY Update. Until tonight every failure exit
+        // here was silent, which is what made the "gray button" rounds unfalsifiable -- so I
+        // added a log to each one. What I actually shipped was ~60 LogWarning calls per second
+        // for as long as the main menu is open, each one formatting an interpolated string and
+        // each one flushed to disk by BepInEx. That is a steadily growing log file and a
+        // steady stream of garbage, in the exact build Brian saw his client run out of memory
+        // on, after a hundred launches that were fine.
+        //
+        // The fix is not "log less detail". It is that a failing Ensure must STOP: retrying a
+        // reflected lookup sixty times a second cannot succeed on frame 3600 if it failed on
+        // frame 1, and the IMGUI fallback is already drawn in the meantime.
+        private static string _lastWarn;
+        private static int _attempts;
+        private static string _labelApplied;
+        private static string _lastRoute;
+        private static bool _handlersReported;
+
+        // Give up after this many consecutive failures. Generous enough to ride out the first
+        // frames of the menu, where FejdStartup.instance and m_menuButtons are legitimately
+        // not ready yet, and small enough that a genuine failure costs a handful of lines
+        // rather than thousands.
+        private const int MaxAttempts = 120;
+
+        // Reset when the dialog's component is recreated -- a new main menu is a new chance,
+        // and without this the cap would persist for the whole process and a player who
+        // returned to the menu would never get the button even if it could be built.
+        // THE TWO PER-FRAME GUARDS, AS PURE FUNCTIONS.
+        //
+        // They were inline, and the IL checks written for them were NON-ORACLES: asserting that
+        // Ensure references _attempts passed even with the cap disabled, because `_attempts++`
+        // references it too. Same for _labelApplied, which the assignment touches regardless of
+        // whether the comparison guarding it survives. Both mutants went undetected -- the test
+        // answered "is this field used?" when the question was "is the guard there?".
+        //
+        // As functions they can be driven directly, which is the only way to check a decision
+        // rather than a mention. Exactly what fixed the reopen-button predicate.
+        internal static bool ShouldGiveUp(int attempts) => attempts >= MaxAttempts;
+
+        internal static bool LabelNeedsApplying(string applied, string next) => next != applied;
+
+        internal static void ResetAttempts()
+        {
+            _attempts = 0;
+            _lastWarn = null;
+        }
+
         // Creates the button if it is not already there. Returns false if it could not be
         // made, which is the signal to fall back rather than leave the player with no route.
         internal static bool Ensure(string label, Action onClick)
@@ -64,9 +113,31 @@ namespace PhValheimCompanion
 
             if (_clone != null)
             {
-                SetLabel(_clone, label);
+                // Only when it actually changed. TMP rebuilds its mesh on assignment, so
+                // setting the same string every frame was pure waste on the one path that runs
+                // every frame while the button is up.
+                if (LabelNeedsApplying(_labelApplied, label))
+                {
+                    SetLabel(_clone, label);
+                    _labelApplied = label;
+                }
                 return true;
             }
+
+            // Stop trying, and say so exactly once. Past this point the drawn fallback is the
+            // player's route and this class is silent.
+            if (ShouldGiveUp(_attempts))
+            {
+                if (_lastWarn != "__capped__")
+                {
+                    _lastWarn = "__capped__";
+                    Main.StaticLogger.LogWarning(
+                        $"Menu button: giving up after {MaxAttempts} attempts -- the drawn button is the only route back. "
+                        + "The reason is the last \"Menu button:\" line above this one.");
+                }
+                return false;
+            }
+            _attempts++;
 
             try
             {
@@ -155,7 +226,10 @@ namespace PhValheimCompanion
             {
                 // The STACK. "could not create it (NullReferenceException)" does not say which
                 // of the reflected reads failed, and there are several.
-                Main.StaticLogger.LogWarning($"Menu button: could not create it -- falling back to the drawn button. {e}");
+                // Through Warn, so a throwing lookup costs one line and not sixty a second.
+                // The exception TYPE and MESSAGE are the dedupe key, so a different failure
+                // still gets its own line.
+                Warn($"could not create it ({e.GetType().Name}: {e.Message})");
                 Remove();
                 return false;
             }
@@ -206,7 +280,11 @@ namespace PhValheimCompanion
                 var found = FirstUsable(root.GetComponentsInChildren<Button>(true));
                 if (found != null)
                 {
-                    Main.StaticLogger.LogMessage($"Menu button: m_menuButtons gave no template, using \"{found.gameObject.name}\" found under {fieldName} instead.");
+                    if (_lastRoute != fieldName)
+                    {
+                        _lastRoute = fieldName;
+                        Main.StaticLogger.LogMessage($"Menu button: m_menuButtons gave no template, using \"{found.gameObject.name}\" found under {fieldName} instead.");
+                    }
                     return found;
                 }
                 tried.Append($"{fieldName} had no usable Button; ");
@@ -285,8 +363,13 @@ namespace PhValheimCompanion
             }
         }
 
+        // ONE LINE PER CHANGE OF REASON, not one per frame. Same discipline as
+        // ConnectDialog.NoteDecline, and for the same reason: this runs at frame rate, so an
+        // unguarded log here is a memory and disk problem rather than a diagnostic.
         private static void Warn(string why)
         {
+            if (why == _lastWarn) return;
+            _lastWarn = why;
             Main.StaticLogger.LogWarning($"Menu button: {why} -- falling back to the drawn button.");
         }
 
@@ -316,6 +399,8 @@ namespace PhValheimCompanion
                 button.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
             }
 
+            if (_handlersReported) return;
+            _handlersReported = true;
             Main.StaticLogger.LogMessage(
                 $"Menu button: cleared runtime listeners and switched off {persistent} inherited persistent listener(s) "
                 + "(these are the ones RemoveAllListeners does not touch -- the reason the clone used to start the game).");
@@ -342,6 +427,7 @@ namespace PhValheimCompanion
                 Main.StaticLogger.LogWarning($"Menu button: could not destroy it ({e.GetType().Name}).");
             }
             _clone = null;
+            _labelApplied = null;   // a rebuilt clone must have its label applied again
         }
 
         // PhValheim's colours on the button's own art.

@@ -509,6 +509,11 @@ namespace PhValheimCompanion
         private void OnDestroy()
         {
             MenuButton.Remove();
+
+            // A new main menu is a fresh chance to build the button, so the give-up counter
+            // must not persist across menus -- otherwise one bad menu silences the button for
+            // the rest of the process.
+            MenuButton.ResetAttempts();
         }
 
         private void NoteDecline(string reason)

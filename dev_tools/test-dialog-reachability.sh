@@ -162,6 +162,32 @@ check MenuButton.DisableInheritedHandlers 'RemoveAllListeners' \
 check MenuButton.Ensure 'AddListener' \
 	"the clone would be inert"
 
+echo
+echo "== NOTHING ON THE PER-FRAME PATH MAY LOG UNCONDITIONALLY =="
+
+# ManageReopenButton calls Ensure on EVERY Update. A log on a failure exit here is ~60 lines a
+# second, each formatting a string and each flushed to disk by BepInEx.
+#
+# This shipped. Every failure exit in Ensure used to be SILENT, which is what made the
+# gray-button rounds unfalsifiable -- so a log was added to each one, and what went out was a
+# per-frame LogWarning for as long as the main menu was open. Brian's client ran out of memory
+# on that build after a hundred launches that were fine. A real diagnostic became a leak.
+#
+# Warn must dedupe on the reason, so a stuck failure costs ONE line.
+check MenuButton.Warn 'MenuButton._lastWarn' \
+	"PER-FRAME LOG: a stuck failure would write ~60 lines a second for as long as the menu is open"
+
+# And a failing Ensure must STOP. A reflected lookup that failed on frame 1 will not succeed on
+# frame 3600, and the drawn fallback is already on screen in the meantime.
+check MenuButton.Ensure 'MenuButton.ShouldGiveUp' \
+	"NO GIVE-UP: Ensure would retry a hopeless lookup at frame rate forever"
+
+# The label is only reapplied when it CHANGED. TMP rebuilds its mesh on assignment, so setting
+# the same string every frame is continuous garbage on the one path that runs every frame while
+# the button is up.
+check MenuButton.Ensure 'MenuButton.LabelNeedsApplying' \
+	"PER-FRAME TMP WRITE: the label would be re-set and re-meshed every frame"
+
 # The clone lives on the CANVAS, not on the menu object, so it outlives this component unless
 # it is explicitly destroyed -- a stale button into the next main menu with a dead callback.
 check ConnectDialog.OnDestroy 'MenuButton.Remove' \

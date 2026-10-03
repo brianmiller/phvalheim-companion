@@ -215,6 +215,7 @@ namespace RenderDialog
             failures += ReopenButtonPredicate(dialog);
             failures += PanelBackgroundSelector(asm);
             failures += ReopenButtonLabelColours(dialog);
+            failures += PerFrameGuards(asm);
             failures += NudgeInvariance(dialog);
             failures += ManifestParserChecks(asm);
 
@@ -508,6 +509,54 @@ namespace RenderDialog
 
             return Expect("relation", ok,
                 $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
+        }
+
+        // THE TWO GUARDS THAT KEEP THE PER-FRAME PATH QUIET.
+        //
+        // Both were inline, and the IL checks written for them were NON-ORACLES: "Ensure
+        // references _attempts" is satisfied by `_attempts++` even with the cap disabled, and
+        // "references _labelApplied" is satisfied by the assignment even with the comparison
+        // gone. Mutation testing caught both passing with the bug reinstated -- the checks
+        // asked whether a field was mentioned, not whether a decision was made.
+        //
+        // Driving the predicates is the only way to tell those apart. The rows that matter are
+        // the ones that must return true: those are the frames on which the mod goes quiet.
+        private static int PerFrameGuards(Assembly companion)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- per-frame guards ---");
+
+            Type mb = companion.GetType("PhValheimCompanion.MenuButton");
+            MethodInfo give = mb?.GetMethod("ShouldGiveUp", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            MethodInfo lab = mb?.GetMethod("LabelNeedsApplying", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (give == null || lab == null)
+            {
+                Console.WriteLine("    FAIL  MenuButton.ShouldGiveUp / LabelNeedsApplying not found -- both guards untested,");
+                Console.WriteLine("          which is the state the per-frame LogWarning shipped in.");
+                return 1;
+            }
+
+            int fails = 0;
+
+            // The cap. 0 and 1 must keep trying (the first menu frames legitimately fail);
+            // a large count must stop, or a stuck lookup logs at frame rate forever.
+            fails += Expect("cap: attempt 0 keeps trying", !(bool)give.Invoke(null, new object[] { 0 }), "fresh menu must retry");
+            fails += Expect("cap: attempt 1 keeps trying", !(bool)give.Invoke(null, new object[] { 1 }), "early frames are legitimately not ready");
+            fails += Expect("cap: attempt 10000 gives up", (bool)give.Invoke(null, new object[] { 10000 }),
+                "THE LEAK: without a cap a hopeless lookup retries and logs ~60x a second forever");
+
+            // The label. Same string must be a no-op; TMP rebuilds its mesh on assignment.
+            fails += Expect("label: unchanged is skipped",
+                !(bool)lab.Invoke(null, new object[] { "PhValheim: VOXYLADY", "PhValheim: VOXYLADY" }),
+                "re-setting an identical label re-meshes TMP every frame");
+            fails += Expect("label: changed is applied",
+                (bool)lab.Invoke(null, new object[] { "PhValheim: OLD", "PhValheim: NEW" }),
+                "a changed world name must reach the button");
+            fails += Expect("label: first application happens",
+                (bool)lab.Invoke(null, new object[] { null, "PhValheim: VOXYLADY" }),
+                "a freshly built clone must get its label or it reads Start Game");
+
+            return fails;
         }
 
         // THE MENU ENTRY'S LABEL IS RICH TEXT, SO IT CAN SHIP BROKEN AND STILL COMPILE.
