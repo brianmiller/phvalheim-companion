@@ -466,9 +466,29 @@ namespace PhValheimCompanion
 
             // "Connect to X" only where connecting is actually possible. The notice has no
             // password, so in that mode the button opens the notice and says so.
-            var label = LaunchPayload.Present ? $"Connect to {world}" : $"PhValheim: {world}";
+            var label = ReopenButtonLabel(LaunchPayload.Present ? "Connect to" : "PhValheim:", world);
 
             _nativeButtonOk = MenuButton.Ensure(label, OnReopenRequested);
+        }
+
+        // The menu entry's label, in two colours: magenta prefix, cyan world name.
+        //
+        // Brian's call, and the magenta is not a palette value -- see Theme.Magenta. The cyan
+        // is --accent-primary, the same colour the world name already has inside the dialog,
+        // so the entry and the notice agree about which word is the world.
+        //
+        // Escape() on the world name is not decoration: this string is TMP rich text, so a
+        // world called "a<b" would otherwise swallow the rest of the label as a malformed tag
+        // and the button would read "PhValheim: a" -- the same hazard as the dialog body, in a
+        // place where there is far less text to lose.
+        //
+        // internal static so dev_tools/renderDialog can assert both colours are actually in
+        // the string. A label is exactly the kind of thing that looks right in the source and
+        // ships with one tag unterminated.
+        internal static string ReopenButtonLabel(string prefix, string world)
+        {
+            return "<color=" + Theme.Magenta + ">" + Escape(prefix) + "</color> "
+                 + "<color=" + ColHighlight + ">" + Escape(world) + "</color>";
         }
 
         // Shared by the native button and the IMGUI fallback, so both routes behave the same.

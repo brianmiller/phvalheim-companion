@@ -118,9 +118,24 @@ namespace PhValheimCompanion
                     return false;
                 }
 
-                // RemoveAllListeners FIRST. The template is a live menu button with Valheim's
-                // own handler on it -- left in place, this button would also Start Game.
-                button.onClick.RemoveAllListeners();
+                // RemoveAllListeners IS NOT ENOUGH, and this cost a round.
+                //
+                // Brian: "Clicking it actually does something now, but it takes you to the
+                // character selection screen." The clone was still running Valheim's own
+                // handler alongside ours -- exactly the hazard the old comment here claimed
+                // RemoveAllListeners prevented.
+                //
+                // UnityEvent.RemoveAllListeners() removes only the listeners added at RUNTIME
+                // through AddListener. Valheim's menu buttons have their handlers wired in the
+                // Inspector, which makes them PERSISTENT listeners serialized into the prefab,
+                // and those are untouched by it. So the call did nothing to the one listener
+                // that mattered.
+                //
+                // The IL test asserted that RemoveAllListeners was CALLED, and it was. Present
+                // is not effective: the assertion was true and the button still started the
+                // game. Persistent listeners have to be switched off one by one.
+                DisableInheritedHandlers(button);
+
                 button.onClick.AddListener(Invoke);
                 button.interactable = true;
 
@@ -275,6 +290,37 @@ namespace PhValheimCompanion
             Main.StaticLogger.LogWarning($"Menu button: {why} -- falling back to the drawn button.");
         }
 
+        // Strip EVERY handler the clone inherited from the live menu button it was copied from.
+        //
+        // Two kinds, and they need two different calls:
+        //
+        //   runtime listeners    -- added via AddListener; cleared by RemoveAllListeners()
+        //   persistent listeners -- wired in the Unity Inspector and serialized in the prefab;
+        //                           NOT cleared by RemoveAllListeners(), which is why the
+        //                           clone of "Start Game" still started the game
+        //
+        // Persistent ones are disabled by index rather than removed, because there is no
+        // runtime API to remove them -- SetPersistentListenerState(i, Off) is the supported
+        // way, and it only affects this clone's own copy of the event.
+        //
+        // Logged with a count, because "we disabled the handlers" and "there were none to
+        // disable" look identical otherwise, and the difference decides whether a future
+        // click-does-two-things report is this code or something else.
+        private static void DisableInheritedHandlers(Button button)
+        {
+            button.onClick.RemoveAllListeners();
+
+            int persistent = button.onClick.GetPersistentEventCount();
+            for (int i = 0; i < persistent; i++)
+            {
+                button.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
+            }
+
+            Main.StaticLogger.LogMessage(
+                $"Menu button: cleared runtime listeners and switched off {persistent} inherited persistent listener(s) "
+                + "(these are the ones RemoveAllListeners does not touch -- the reason the clone used to start the game).");
+        }
+
         // Separate named method rather than a lambda so the IL carries a call this mod's own
         // reachability test can see.
         private static void Invoke()
@@ -339,24 +385,32 @@ namespace PhValheimCompanion
             }
         }
 
+        // The label is RICH TEXT -- two colours in one string, magenta prefix and cyan world
+        // name, built by ConnectDialog.ReopenButtonLabel.
+        //
+        // THE BASE COLOUR MUST BE WHITE. TMP multiplies a <color> tag against the component's
+        // own `color` property, so leaving the violet theme colour on the component would
+        // darken and skew both tag colours -- the magenta would not be magenta. White is the
+        // identity for that multiply, which is why the per-component tint that used to be here
+        // is gone rather than merely changed.
         private static void SetLabel(GameObject go, string label)
         {
             try
             {
-                Color themed;
-                bool themeOk = ColorUtility.TryParseHtmlString(Theme.Button, out themed);
                 // Both text kinds. Valheim's menu buttons are TMP, but a clone that picked up a
                 // legacy Text somewhere would otherwise keep the template's own wording -- a
                 // button reading "Start Game" that opens our notice is worse than no button.
                 foreach (var t in go.GetComponentsInChildren<TMP_Text>(true))
                 {
+                    t.richText = true;             // default, but the label is meaningless without it
+                    t.color = Color.white;
                     t.text = label;
-                    if (themeOk) t.color = themed;
                 }
                 foreach (var t in go.GetComponentsInChildren<Text>(true))
                 {
+                    t.supportRichText = true;
+                    t.color = Color.white;
                     t.text = label;
-                    if (themeOk) t.color = themed;
                 }
             }
             catch (Exception e)

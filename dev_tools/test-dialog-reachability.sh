@@ -134,10 +134,31 @@ check ConnectDialog.ManageReopenButton 'MenuButton.Ensure' \
 check MenuButton.Ensure 'Instantiate' \
 	"nothing is cloned, so there is no button"
 
-# THE DANGEROUS ONE. The template is a LIVE Valheim menu button with its own handler attached.
-# Left in place, our clone also runs whatever that button does -- Start Game, for instance.
-check MenuButton.Ensure 'RemoveAllListeners' \
-	"the clone would keep Valheim's own handler and do two things at once"
+# THE DANGEROUS ONE, AND THE CHECK THAT WAS TRUE WHILE THE BUG WAS LIVE.
+#
+# The template is a LIVE Valheim menu button with its own handler attached. This used to assert
+# MenuButton.Ensure calls RemoveAllListeners, which it did -- and Brian still reported "clicking
+# it takes you to the character selection screen", because the clone was running Valheim's
+# handler as well as ours.
+#
+# UnityEvent.RemoveAllListeners() clears only RUNTIME listeners (AddListener). Valheim's menu
+# buttons are wired in the Inspector, so theirs are PERSISTENT listeners serialized in the
+# prefab, and RemoveAllListeners does not touch them. The assertion was satisfied and the
+# button still started the game: present is not effective.
+#
+# So the check is now anchored on the call that actually disables them. SetPersistentListenerState
+# is the only runtime way to switch a persistent listener off.
+check MenuButton.Ensure 'MenuButton.DisableInheritedHandlers' \
+	"nothing would strip the handler the clone inherited from the live menu button"
+
+check MenuButton.DisableInheritedHandlers 'SetPersistentListenerState' \
+	"INHERITED HANDLER LIVE: RemoveAllListeners alone leaves the prefab's own listener, so the clone also runs Start Game"
+
+check MenuButton.DisableInheritedHandlers 'GetPersistentEventCount' \
+	"without the count the loop cannot visit every inherited listener"
+
+check MenuButton.DisableInheritedHandlers 'RemoveAllListeners' \
+	"runtime listeners would survive a re-Ensure and our own handler would fire twice"
 check MenuButton.Ensure 'AddListener' \
 	"the clone would be inert"
 

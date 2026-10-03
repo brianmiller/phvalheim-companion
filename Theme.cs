@@ -35,5 +35,14 @@
         // first and a rule written against object NAMES, not sizes.
         internal const string ButtonFill = "#334155";   // --bg-tertiary    slate 700, button faces
         internal const string TextBody   = "#f1f5f9";   // --text-primary   slate 100, body text
+
+        // NOT FROM THE STYLESHEET, AND THAT IS DELIBERATE.
+        //
+        // Brian asked for the menu entry's "PhValheim" to be magenta with the world name in
+        // cyan. There is no magenta in :root, so this is his explicit choice rather than a
+        // palette value -- which is worth writing down, because the palette drift test exists
+        // to prove every OTHER colour here came from phvalheimStyles.css. A future pass that
+        // reads "all colours come from the stylesheet" as a rule would delete this one.
+        internal const string Magenta = "#ff00ff";
     }
 }

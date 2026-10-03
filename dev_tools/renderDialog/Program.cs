@@ -214,6 +214,7 @@ namespace RenderDialog
             failures += FailureClipFitsOneLine(dialog);
             failures += ReopenButtonPredicate(dialog);
             failures += PanelBackgroundSelector(asm);
+            failures += ReopenButtonLabelColours(dialog);
             failures += NudgeInvariance(dialog);
             failures += ManifestParserChecks(asm);
 
@@ -507,6 +508,59 @@ namespace RenderDialog
 
             return Expect("relation", ok,
                 $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
+        }
+
+        // THE MENU ENTRY'S LABEL IS RICH TEXT, SO IT CAN SHIP BROKEN AND STILL COMPILE.
+        //
+        // Brian asked for "PhValheim" in magenta and the world name in cyan. That is two
+        // <color> tags in one string -- a construction where an unbalanced tag silently eats
+        // the rest of the label, and where nothing in the compiler or the IL would notice.
+        //
+        // It also runs operator data (the world name) through TMP markup, which is the same
+        // hazard the dialog body has: a world called "a<b" would swallow the remainder and the
+        // button would read "PhValheim: a".
+        private static int ReopenButtonLabelColours(Type dialog)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- reopen button label ---");
+
+            MethodInfo m = dialog.GetMethod("ReopenButtonLabel",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (m == null)
+            {
+                Console.WriteLine("    FAIL  ConnectDialog.ReopenButtonLabel not found -- the label is untested.");
+                return 1;
+            }
+
+            string label = (string)m.Invoke(null, new object[] { "PhValheim:", "VOXYLADY" });
+            Console.WriteLine($"    rendered: {label}");
+
+            int fails = 0;
+            fails += Expect("magenta prefix", label.Contains("<color=#ff00ff>PhValheim:</color>"),
+                "the prefix is magenta and closed");
+            fails += Expect("cyan world", label.Contains("<color=#22d3ee>VOXYLADY</color>"),
+                "the world name is --accent-primary and closed");
+
+            // Balance, counted rather than eyeballed. Two opens, two closes.
+            int opens = CountOccurrences(label, "<color=");
+            int closes = CountOccurrences(label, "</color>");
+            fails += Expect("tags balanced", opens == 2 && closes == 2,
+                $"two opened and two closed (got {opens}/{closes})");
+
+            // The world name is operator data going into markup.
+            string nasty = (string)m.Invoke(null, new object[] { "PhValheim:", "a<b>c" });
+            fails += Expect("world name escaped",
+                !nasty.Contains("<b>") && nasty.Contains("</color>"),
+                "angle brackets in a world name cannot open a tag of their own");
+
+            return fails;
+        }
+
+        private static int CountOccurrences(string haystack, string needle)
+        {
+            int n = 0, i = 0;
+            while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; }
+            return n;
         }
 
         // THE PANEL SELECTOR, DRIVEN WITH THE REAL TREE.
