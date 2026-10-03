@@ -250,6 +250,15 @@ namespace PhValheimCompanion
 
             if (_shown || _closedByPlayer) return;
 
+            // WHY THIS LOGS.
+            //
+            // The reopen button cleared the flags and the notice still did not come back, twice
+            // in a row, and both of my explanations were wrong. Every gate from here on is
+            // silent: Update simply returns and the next frame returns again, so "nothing
+            // happened" is the only symptom and there is nothing in the log to separate the
+            // five possible causes. One line per CHANGE of reason -- not per frame -- turns the
+            // next report into a fact instead of a fourth theory.
+
             // BOTH modes, or this component is attached and then does nothing.
             //
             // This line was LaunchPayload.Present alone and it is the third gate in the chain:
@@ -262,15 +271,55 @@ namespace PhValheimCompanion
             // contained all the new strings, the manifest was in the payload zip, eight verify
             // markers were green. None of them could see that the path was unreachable.
             // dev_tools/test-dialog-reachability.sh reads the IL of this method instead.
-            if (!LaunchPayload.Present && !ClientManifest.Present) return;
+            if (!LaunchPayload.Present && !ClientManifest.Present)
+            {
+                NoteDecline("no payload and no manifest");
+                return;
+            }
 
             // UnifiedPopup is not wired up for the first few frames of the main menu, and
             // pushing into it early silently does nothing. Waiting for IsAvailable() is why
             // this is an Update loop and not a one-shot call from the patch.
-            if (!IsReadyToShow()) return;
+            if (!IsReadyToShow())
+            {
+                NoteDecline(WhyNotReady());
+                return;
+            }
 
+            NoteDecline(null);
             _shown = true;
             Show();
+        }
+
+        // The last reason Update gave for not showing, so the log carries one line per change
+        // rather than one per frame at 60fps.
+        private string _lastDecline;
+
+        private void NoteDecline(string reason)
+        {
+            if (reason == _lastDecline) return;
+            _lastDecline = reason;
+            if (reason != null) Main.StaticLogger.LogMessage($"PhValheim dialog waiting: {reason}.");
+            else Main.StaticLogger.LogMessage("PhValheim dialog: ready, showing it now.");
+        }
+
+        // Names which of IsReadyToShow's gates said no. Separate from IsReadyToShow so that
+        // method keeps its single job and its one try/catch; this is only ever called on a
+        // frame that already declined, so the double read costs nothing that matters.
+        private string WhyNotReady()
+        {
+            try
+            {
+                if (FejdStartup.instance == null) return "the main menu object is gone";
+                if (!UnifiedPopup.IsAvailable()) return "UnifiedPopup is not available yet";
+                if (UnifiedPopup.IsVisible()) return "another popup is already on screen";
+                if (!IsMainMenuActive()) return "the main menu is not the active screen";
+                return "a gate in IsReadyToShow refused without saying which";
+            }
+            catch (Exception e)
+            {
+                return $"reading the menu state threw {e.GetType().Name}";
+            }
         }
 
         // Three callers want this and each wants something different when the read itself
@@ -1244,8 +1293,10 @@ namespace PhValheimCompanion
                 // Clearing _shown instead lets Update() show it on a frame when
                 // IsReadyToShow() actually says yes, which is the path that puts the dialog up
                 // in the first place and the only one proven to work.
+                Main.StaticLogger.LogMessage("PhValheim button clicked; handing the dialog to Update().");
                 _closedByPlayer = false;
                 _shown = false;
+                _lastDecline = "__clicked__";   // force the next decline to log, whatever it is
             }
         }
     }
