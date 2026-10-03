@@ -27,12 +27,12 @@
 
         // The chrome: the box itself, rather than the words in it.
         //
-        // Brian's note on the first theming pass was exact -- "the styling added to the dialog
-        // is really just the blue text". The panel was still Valheim's brown parchment art,
-        // which is the largest thing on screen and so decides what the dialog reads as. These
-        // four are what PanelSkin paints it with.
-        internal const string PanelFill  = "#0f172a";   // --bg-primary     slate 900, the box
-        internal const string PanelEdge  = "#22d3ee";   // --accent-primary cyan 400,  the border
+        // THE PANEL'S BACKGROUND AND BORDER ARE NOT HERE, DELIBERATELY. They were -- as
+        // PanelFill and PanelEdge, painted by a PanelSkin class that identified the panel's
+        // background art by rect area. That shipped as a full-screen box with a border and no
+        // text, because the largest Image under the popup is a full-screen overlay and not the
+        // panel. See PanelTree for the full account. Re-adding them needs the real Image tree
+        // first and a rule written against object NAMES, not sizes.
         internal const string ButtonFill = "#334155";   // --bg-tertiary    slate 700, button faces
         internal const string TextBody   = "#f1f5f9";   // --text-primary   slate 100, body text
     }

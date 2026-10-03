@@ -191,39 +191,30 @@ notcheck ConnectDialog.ShowLaunchHelp 'OpenURL' \
 	"a single client url cannot be right for every platform -- the button was removed"
 
 echo
-echo "== the BOX is skinned, and the skin cannot eat a click =="
+echo "== the panel tree is REPORTED, not guessed at =="
 
-# Brian: "the styling added to the dialog is really just the blue text. The entire thing,
-# including the box background, buttons and border should be in PhValheim's style."
-check ConnectDialog.ApplyChromeStyle 'PanelSkin.Apply' \
-	"the panel would keep Valheim's brown parchment art and only the text would be themed"
+# The reskin that identified the panel background by rect area shipped as a full-screen box
+# with a border and no text. What replaced it only READS. These two checks pin that: the tree
+# must be logged, and nothing may paint the panel again until the tree has been read.
+check ConnectDialog.ApplyChromeStyle 'PanelTree.LogOnce' \
+	"the popup's Image tree would still be unknown, and the next reskin another guess"
 
-# In ApplyChromeStyle and NOT in ScalePanel. PanelSkin picks the background art out by RECT
-# AREA, and on the help path ScalePanel runs BEFORE UnifiedPopup.Push, when every rect still
-# measures zero -- it would find nothing and leave the panel brown, silently.
-notcheck ConnectDialog.ScalePanel 'PanelSkin' \
-	"ScalePanel runs pre-Push on the help path, when every rect is zero and no art can be found"
+notcheck ConnectDialog.ApplyChromeStyle 'PanelSkin' \
+	"PanelSkin identified the background by SIZE and produced a full-screen box over the text"
 
-# THE DANGEROUS ONE, and it is the same bug as the reopen button one layer up: the backdrop
-# covers the ENTIRE panel, so an Image left as a raycast target swallows every click in the
-# dialog -- Connect and Close included. A popup that draws perfectly and cannot be dismissed.
-check PanelSkin.AddQuad 'set_raycastTarget' \
-	"CLICK BLOCKER: a full-panel Image left as a raycast target makes every button in the dialog dead"
+# NEGATIVE, and this is the one with teeth: a read-only reporter must not instantiate or
+# recolour anything. If PanelTree ever grows an Instantiate it has stopped being a diagnostic.
+notcheck PanelTree.LogOnce 'Instantiate' \
+	"a diagnostic that creates objects is a reskin again, and the last one made the dialog unusable"
 
-# Hiding Valheim's art is only safe because it is put back. Left hidden, vanilla's "Remove
-# this character?" renders with no background at all -- unreadable over the main menu.
-check ConnectDialog.RestorePopupSkin 'PanelSkin.Restore' \
-	"MISSING RESTORE: Valheim's own popups would keep our backdrop and their art would stay invisible"
+echo
+echo "== the way back does not depend on a button at all =="
 
-# Order inside Restore: colours before objects. A destroyed GameObject's Image is null, so
-# restoring colours afterwards throws partway down the list and leaves the rest skinned.
-check PanelSkin.Restore 'Destroy' \
-	"the inserted backdrop and border would survive onto every later popup in the session"
-
-# The body's base colour. Every coloured run carries its own tag, but the plain prose between
-# them inherited Valheim's parchment cream, which is wrong against a slate panel.
-check ConnectDialog.RestorePopupSkin 'ConnectDialog._savedBodyColor' \
-	"MISSING RESTORE: the body colour would leak onto every later popup in the session"
+# The reopen button has failed in three forms on Brian's client. This route uses only
+# m_mainMenu's active state -- the same read that already decides whether the dialog may show,
+# which is proven to work because the dialog shows.
+check ConnectDialog.Update 'ConnectDialog._menuWasActive' \
+	"leaving the main menu and returning would not re-offer the notice, so a dead button would again be the only route"
 
 echo
 echo "== the reopen button has more than one way to find a template =="

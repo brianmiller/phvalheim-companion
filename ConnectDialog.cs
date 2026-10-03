@@ -77,6 +77,11 @@ namespace PhValheimCompanion
         private bool _shown;
         private bool _closedByPlayer;
 
+        // Whether the main menu was the active screen last frame. Drives the no-button way
+        // back in Update(); see the comment there. Starts true so the frame this component is
+        // attached on -- when the menu is already up -- is not read as a return to it.
+        private bool _menuWasActive = true;
+
         // Saved so they can be put back. yesText and noText live on the UnifiedPopup INSTANCE,
         // not on the popup being pushed, so overwriting them without restoring would relabel
         // every later Yes/No dialog in the session -- "Remove this character?" would offer
@@ -302,6 +307,31 @@ namespace PhValheimCompanion
                 }
                 return;
             }
+
+            // THE WAY BACK THAT NEEDS NO BUTTON.
+            //
+            // The reopen button has now failed on Brian's client in three different forms: an
+            // IMGUI button that drew and never received a click, and twice a cloned native
+            // button that was never created at all. Every one of those depends on something I
+            // cannot observe from here -- an input path, a raycast, a canvas, a reflected field.
+            //
+            // This depends on none of them. It re-offers the notice when the player LEAVES the
+            // main menu and comes back, using only m_mainMenu's active state, which is already
+            // proven to read correctly on his client: it is the same gate that decides whether
+            // the dialog may show at all, and the dialog demonstrably shows.
+            //
+            // Leaving and returning is a deliberate act, so this cannot pester a player who
+            // just wants the notice gone -- they close it and carry on, and it is only offered
+            // again if they navigate away and back. Still gated by ShowLaunchHelp for the
+            // player who wants it off for good.
+            bool menuActive = IsMainMenuActive();
+            if (menuActive && !_menuWasActive && _closedByPlayer && !ConnectFlow.Connecting)
+            {
+                _closedByPlayer = false;
+                _shown = false;
+                Main.StaticLogger.LogMessage("Back on the main menu after the PhValheim notice was closed -- offering it again.");
+            }
+            _menuWasActive = menuActive;
 
             // THE WAY BACK, handled before the early return below -- that return is taken on
             // exactly the frames when the button should be on screen.
@@ -871,15 +901,28 @@ namespace PhValheimCompanion
             var popup = PopupInstance();
             if (popup == null) return;
 
-            // The BOX, before anything in it. Here and not in ScalePanel for the same reason
-            // the body style is here: ScalePanel runs before UnifiedPopup.Push on the help
-            // path, when the panel is inactive and every rect still measures zero -- and
-            // PanelSkin picks out the background art BY RECT AREA, so it would find nothing
-            // and quietly leave the panel brown.
-            if (Utils.TryGetFieldValue(popup, "popupUIParent", out var skinParent)
-                && skinParent is GameObject skinPanel)
+            // NO PANEL RESKIN HERE, AND THE REASON IS WORTH KEEPING.
+            //
+            // A PanelSkin class used to repaint the box: it found the panel's background art by
+            // taking the LARGEST Image under popupUIParent, hid it, and inserted a solid
+            // PhValheim-coloured quad with a cyan border copied from its rect. It shipped and
+            // Brian got "a full screen with border but no text".
+            //
+            // So the largest Image under popupUIParent is NOT the panel's background -- it is a
+            // FULL-SCREEN overlay (UnifiedPopup has a fullScreenBackgroundCover, and whatever
+            // was found measured the whole screen). Copying its rect produced a screen-sized
+            // quad, and inserting that at the overlay's sibling index + 1 put it on top of the
+            // panel's text instead of behind it.
+            //
+            // The lesson is not "pick a different Image". It is that the popup's Image tree
+            // cannot be guessed from a build host, and every rule I invented for identifying
+            // the background by SIZE was a guess dressed up as a measurement. Reskinning the
+            // box needs the real tree first -- which the mod now logs on every show -- and a
+            // rule written against it, not against an assumption about which Image is biggest.
+            if (Utils.TryGetFieldValue(popup, "popupUIParent", out var treeParent)
+                && treeParent is GameObject treePanel)
             {
-                PanelSkin.Apply(skinPanel);
+                PanelTree.LogOnce(treePanel);
             }
 
             if (Utils.TryGetFieldValue(popup, "headerText", out var headerObj) && headerObj is TMP_Text header)
@@ -1028,11 +1071,6 @@ namespace PhValheimCompanion
         {
             var popup = PopupInstance();
 
-            // The box first. PanelSkin hid Valheim's background art and inserted objects of its
-            // own, so a missed restore here is not a wrong colour on the next dialog -- it is
-            // vanilla's "Remove this character?" rendered inside OUR panel, with its art still
-            // invisible. The most visible leak available.
-            PanelSkin.Restore();
 
             // The centre button's label, put back before anything else. Left overridden it
             // reads "Close" on every later warning dialog in the session, vanilla's included.
