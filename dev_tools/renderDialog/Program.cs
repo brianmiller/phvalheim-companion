@@ -155,6 +155,47 @@ namespace RenderDialog
                 mods: new List<string> { "CustomSeed  (ZeroBandwidth)", "serverblankpassword", "ThorsKist", "TickMonitor  (PhValheim)" });
             SetLastFailure(asm, null);
 
+            // THE LAUNCH-HELP NOTICE -- the no-payload dialog.
+            //
+            // Rendered here rather than in a file of its own because the budget maths, the
+            // wrap width and the visualiser all live here, and a second copy of them is a
+            // second thing to be wrong. This body has no scrolling mod list, so the full-panel
+            // budget is the one that applies.
+            failures += RenderHelp(asm, dialog, "LAUNCH HELP: modded world with an address",
+                new[]
+                {
+                    "world=Midgard", "host=valheim.example.com", "port=25003",
+                    "vanilla=0", "crossplay=0", "minClientVersion=2.0.14",
+                    "clientUrl=https://phv.example.com/download?os=win&v=2",
+                });
+
+            // A crossplay world has no address. The body must not print one, and must say what
+            // to use instead -- printing host:port here would send the player at a port that
+            // is not even open.
+            failures += RenderHelp(asm, dialog, "LAUNCH HELP: crossplay world (no address)",
+                new[]
+                {
+                    "world=JustStarted", "host=valheim.example.com", "port=25004",
+                    "vanilla=0", "crossplay=1", "minClientVersion=2.0.14",
+                    "clientUrl=https://phv.example.com/download",
+                });
+
+            failures += RenderHelp(asm, dialog, "LAUNCH HELP: worst case long name",
+                new[]
+                {
+                    "world=AVeryLongWorldNameThatSomebodyWillAbsolutelyUse",
+                    "host=a-rather-long-hostname.someones-homelab.example.com", "port=25999",
+                    "vanilla=0", "crossplay=0", "minClientVersion=2.0.14",
+                    "clientUrl=https://phv.example.com/download?os=win&v=2",
+                });
+
+            // A manifest written by a server that did not set the version. The sentence about
+            // app versions is dropped rather than printed with a blank in it.
+            failures += RenderHelp(asm, dialog, "LAUNCH HELP: no minClientVersion in the manifest",
+                new[] { "world=Bare", "host=h.example.com", "port=25000", "clientUrl=" });
+
+            failures += ManifestParserChecks(asm);
+
             Console.WriteLine(failures == 0
                 ? "== all layouts within budget =="
                 : $"== {failures} layout(s) OVER BUDGET ==");
@@ -252,6 +293,168 @@ namespace RenderDialog
             }
 
             return failures;
+        }
+
+        // Render the launch-help body from a manifest, and assert the things that make it
+        // correct rather than only that it fits.
+        //
+        // The parse is done by the SHIPPED ClientManifest.FromLines, not by this file: the
+        // split-on-first-'=' rule is the part most likely to be got wrong, and a harness with
+        // its own parser would pass while the product truncated every URL at the query string.
+        private static int RenderHelp(Assembly asm, Type dialog, string label, string[] lines)
+        {
+            Type manifestType = asm.GetType("PhValheimCompanion.ClientManifest");
+            if (manifestType == null)
+            {
+                Console.WriteLine($"FAIL  [{label}] ClientManifest missing from the assembly.");
+                return 1;
+            }
+
+            MethodInfo fromLines = manifestType.GetMethod("FromLines",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            MethodInfo buildHelp = dialog.GetMethod("BuildLaunchHelpBody",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+
+            if (fromLines == null || buildHelp == null)
+            {
+                Console.WriteLine($"FAIL  [{label}] ClientManifest.FromLines or ConnectDialog.BuildLaunchHelpBody not found "
+                    + "-- if either was renamed this harness is blind; fix it, do not delete it.");
+                return 1;
+            }
+
+            object manifest = fromLines.Invoke(null, new object[] { lines, label });
+            if (manifest == null)
+            {
+                Console.WriteLine($"FAIL  [{label}] FromLines returned null for a manifest that names a world.");
+                return 1;
+            }
+
+            int failures = 0;
+            string body = (string)buildHelp.Invoke(null, new object[] { manifest });
+
+            int rendered = CountRenderedLines(body);
+            bool over = rendered > _lineBudget;
+            if (over) failures++;
+
+            Console.WriteLine();
+            Console.WriteLine($"--- {label} ---");
+            Console.WriteLine(Visualise(body));
+            Console.WriteLine($"    rendered lines: {rendered} (budget {_lineBudget}) {(over ? "<<< OVER BUDGET" : "ok")}");
+
+            // CONTENT ASSERTIONS. The budget alone would pass on an empty body.
+            bool crossplay = (bool)manifestType.GetProperty("IsCrossplay").GetValue(manifest);
+            string host = (string)manifestType.GetProperty("Host").GetValue(manifest);
+            string port = (string)manifestType.GetProperty("Port").GetValue(manifest);
+            string stripped = StripTags(body);
+
+            // The world name, always: a notice that does not say which world it is about
+            // cannot be acted on.
+            // !IsNullOrEmpty FIRST. string.Contains("") is true of every string, so asserting
+            // only Contains(world) passes vacuously the moment the world name is blank -- which
+            // is precisely the state the parser is supposed to refuse. Caught by mutating
+            // ClientManifest to accept a nameless manifest: all four cases reported "ok".
+            string world = (string)manifestType.GetProperty("World").GetValue(manifest);
+            failures += Expect(label, !string.IsNullOrEmpty(world) && stripped.Contains(world),
+                $"names the world \"{world}\"");
+
+            // The address appears for an address world and NEVER for a crossplay one. Both
+            // directions, because asserting only the first would pass on a body that always
+            // prints host:port -- which is the bug.
+            string addr = host + ":" + port;
+            failures += crossplay
+                ? Expect(label, !stripped.Contains(addr), "does NOT print an address for a crossplay world")
+                : Expect(label, stripped.Contains(addr), $"prints the address {addr}");
+
+            // Never the password itself, only where to find it. The manifest carries no
+            // password, so the only way this could fail is someone adding one later.
+            failures += Expect(label, stripped.IndexOf("Password", StringComparison.Ordinal) >= 0
+                && stripped.IndexOf("on the world's page", StringComparison.Ordinal) >= 0,
+                "says where the password is");
+
+            // It must NOT assert the player's app is out of date -- it cannot know that. See
+            // ClientManifest's note on the two indistinguishable causes.
+            failures += Expect(label,
+                stripped.IndexOf("is out of date", StringComparison.OrdinalIgnoreCase) < 0
+                && stripped.IndexOf("your app is too old", StringComparison.OrdinalIgnoreCase) < 0,
+                "does not claim the player's app is out of date");
+
+            // The version sentence appears only when there is a version to name, and a blank
+            // must never be printed as though it were one.
+            string minVer = (string)manifestType.GetProperty("MinClientVersion").GetValue(manifest);
+            failures += string.IsNullOrEmpty(minVer)
+                ? Expect(label, stripped.IndexOf("or newer", StringComparison.Ordinal) < 0,
+                    "omits the version requirement when the manifest has no version")
+                : Expect(label, stripped.Contains(minVer) && stripped.Contains("or newer"),
+                    $"names the required version {minVer}");
+
+            // It must always say what to DO. The budget cut that brought this body from 15
+            // lines to 6 is exactly the kind of edit that can delete the instruction and leave
+            // a description of the problem behind.
+            failures += Expect(label, stripped.IndexOf("Start it from the PhValheim app", StringComparison.Ordinal) >= 0,
+                "tells the player what to do");
+
+            return failures;
+        }
+
+        // The manifest parser's edge cases, with the controls that matter.
+        //
+        // RenderHelp above only ever feeds it well-formed input, and a parser that accepted
+        // ANYTHING would pass every one of those cases. These are the ones that decide whether
+        // the notice appears at all, and whether what it prints is the whole value.
+        private static int ManifestParserChecks(Assembly asm)
+        {
+            Type t = asm.GetType("PhValheimCompanion.ClientManifest");
+            MethodInfo fromLines = t?.GetMethod("FromLines",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (fromLines == null)
+            {
+                Console.WriteLine("FAIL  [manifest parser] ClientManifest.FromLines not found.");
+                return 1;
+            }
+
+            Func<string[], object> parse = lines => fromLines.Invoke(null, new object[] { lines, "parser-check" });
+            Func<object, string, string> str = (m, prop) => (string)t.GetProperty(prop).GetValue(m);
+
+            int failures = 0;
+            Console.WriteLine();
+            Console.WriteLine("--- manifest parser ---");
+
+            // CONTROL 1: no world name -> no manifest -> no dialog. Without this the parser
+            // could return an object with World=="" and the notice would appear titled with a
+            // blank, telling the player nothing about which world it concerns.
+            failures += Expect("parser", parse(new[] { "host=h", "port=1" }) == null,
+                "refuses a manifest with no world name");
+
+            // CONTROL 2: and it is not refusing everything. A parser that always returned null
+            // would pass CONTROL 1 and silently disable the whole feature.
+            failures += Expect("parser", parse(new[] { "world=W" }) != null,
+                "accepts a manifest that does name a world");
+
+            // The URL keeps its query string. Splitting on every '=' truncated this to
+            // "https://h/dl?os" in the first draft -- a value that still looks like a URL,
+            // which is exactly why it needs asserting rather than eyeballing.
+            var urly = parse(new[] { "world=W", "clientUrl=https://h/dl?os=win&v=2" });
+            failures += Expect("parser", str(urly, "ClientUrl") == "https://h/dl?os=win&v=2",
+                $"keeps a URL containing '=' whole (got \"{str(urly, "ClientUrl")}\")");
+
+            // Comments and blank lines are skipped rather than parsed into junk keys.
+            var commented = parse(new[] { "# written by phvalheim", "", "world=W", "port=25000" });
+            failures += Expect("parser", commented != null && str(commented, "Port") == "25000",
+                "skips comments and blank lines");
+
+            // Flags are '1'/'0', and anything else is NOT true. An == "0" test would have read
+            // an empty value as crossplay and withheld the address from a world that has one.
+            var flags = parse(new[] { "world=W", "host=h", "port=1", "crossplay=" });
+            failures += Expect("parser", flags != null && (bool)t.GetProperty("HasAddress").GetValue(flags),
+                "an empty crossplay flag is not crossplay, so the address still shows");
+
+            return failures;
+        }
+
+        private static int Expect(string label, bool ok, string what)
+        {
+            Console.WriteLine($"    {(ok ? "ok  " : "FAIL")}  {what}");
+            return ok ? 0 : 1;
         }
 
         // Strip the rich-text tags, then count lines INCLUDING the ones wrapping produces.

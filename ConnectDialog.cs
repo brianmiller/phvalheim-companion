@@ -236,7 +236,16 @@ namespace PhValheimCompanion
         internal void Show()
         {
             var payload = LaunchPayload.Current;
-            if (payload == null) return;
+
+            // No payload, but a manifest: the launch-help notice instead of the connect
+            // dialog. Two different questions, so two different dialogs -- but the same
+            // UnifiedPopup plumbing, because getting that panel to lay out correctly took two
+            // rounds of measuring screenshots and must not be reimplemented beside itself.
+            if (payload == null)
+            {
+                ShowLaunchHelp();
+                return;
+            }
 
             try
             {
@@ -311,6 +320,66 @@ namespace PhValheimCompanion
             {
                 Main.StaticLogger.LogWarning($"Could not prepare the scrolling mod list ({e.GetType().Name}); the mods will be listed inline.");
                 return false;
+            }
+        }
+
+        // The notice for "a PhValheim world is installed here, but nothing asked me to join
+        // it". No mod list and no Connect button, because neither would be honest: the mods
+        // belong to a world the player has not asked to enter, and connecting needs a password
+        // the manifest deliberately does not carry.
+        private void ShowLaunchHelp()
+        {
+            var manifest = ClientManifest.Current;
+            if (manifest == null) return;
+
+            var haveUrl = !string.IsNullOrEmpty(manifest.ClientUrl);
+
+            try
+            {
+                // Left button offers the client download when there is a URL to offer. With no
+                // URL both buttons just close -- an "update" button that goes nowhere is worse
+                // than no button, and the body text still names the world and the address.
+                ApplyPopupSkin(yesLabel: "Close", noLabel: haveUrl ? "Get the app" : "Close");
+
+                UnifiedPopup.Push(new YesNoPopup(
+                    "PhValheim",
+                    BuildLaunchHelpBody(manifest),
+                    OnClose,                              // yes slot -> right button -> "Close"
+                    // PopupButtonCallback, not Action: YesNoPopup's own delegate type, and a
+                    // conditional of two method groups needs the target type named explicitly.
+                    haveUrl ? (PopupButtonCallback)OnGetClient : OnClose,
+                    false,
+                    true));
+
+                ApplyChromeStyle();
+                ApplyBodyStyle();
+            }
+            catch (Exception e)
+            {
+                Main.StaticLogger.LogError($"Could not show the launch-help notice ({e.GetType().Name}: {e.Message}). To join \"{manifest.World}\", start it from the PhValheim app.");
+                RestorePopupSkin();
+                _closedByPlayer = true;
+            }
+        }
+
+        private void OnGetClient()
+        {
+            var manifest = ClientManifest.Current;
+
+            Pop();
+            RestorePopupSkin();
+            _closedByPlayer = true;
+
+            try
+            {
+                Application.OpenURL(manifest.ClientUrl);
+                Main.StaticLogger.LogMessage($"Opened {manifest.ClientUrl} in the browser.");
+            }
+            catch (Exception e)
+            {
+                // Named in the log rather than swallowed: a player who clicked and saw nothing
+                // happen needs the address from somewhere, and the log is where it is.
+                Main.StaticLogger.LogWarning($"Could not open the browser ({e.GetType().Name}). Get the PhValheim app from {manifest.ClientUrl}");
             }
         }
 
@@ -728,6 +797,69 @@ namespace PhValheimCompanion
         // listIsSeparate: the scrolling list is showing the names, so the body gives only the
         // count. Passed in rather than read from a field because this method is also called by
         // dev_tools/render-dialog, outside any instance.
+        // The launch-help body: "this world is installed, but nothing asked me to join it".
+        //
+        // EVERY SENTENCE HERE HAS TO BE TRUE OF BOTH CAUSES.
+        // The Companion cannot tell an outdated PhValheim app from a plain Steam launch of an
+        // install PhValheim set up -- see ClientManifest. So this does not open with "your app
+        // is out of date": for the player who launched from Steam on a current app that is
+        // simply false, and a dialog that tells a player something false about their own
+        // machine is how a helpful notice becomes a bug report. It describes the situation,
+        // names both causes, and gives the one action that fixes either.
+        //
+        // Static and manifest-only so dev_tools/render-dialog can draw it without a game.
+        internal static string BuildLaunchHelpBody(ClientManifest manifest)
+        {
+            var sb = new StringBuilder();
+
+            sb.Append("<align=left>");
+
+            sb.Append("<size=115%><b><color=").Append(ColHighlight).Append('>')
+              .Append(Escape(manifest.World)).Append("</color></b></size>\n");
+
+            // EVERY LINE COSTS. BodyLineBudget is 8 rendered lines at BodyFontSize, a blank
+            // line costs one of them, and a sentence past the wrap width costs two. The first
+            // draft of this body explained both causes in full prose and came to FIFTEEN --
+            // dev_tools/renderDialog caught it, which is the only reason it is not a screenshot
+            // of a notice running off the bottom of the panel. Keep it to six.
+            sb.Append('\n');
+
+            sb.Append("Nothing handed Valheim a world to join.\n");
+
+            // States the requirement without asserting the player has failed it. The Companion
+            // cannot know which of the two causes applies (see ClientManifest), so "version X
+            // or newer" is the one phrasing that is true for both the player on an old app and
+            // the player who launched from Steam on a current one.
+            if (!string.IsNullOrEmpty(manifest.MinClientVersion))
+            {
+                sb.Append("Start it from the PhValheim app, version <b>")
+                  .Append(Escape(manifest.MinClientVersion)).Append("</b> or newer.\n");
+            }
+            else
+            {
+                sb.Append("Start it from the PhValheim app.\n");
+            }
+
+            // The address, for a player who wants to join by hand from Valheim's own menu.
+            // Withheld for a crossplay world, which has no address -- see
+            // ClientManifest.HasAddress.
+            if (manifest.HasAddress)
+            {
+                Row(sb, "Address", "<color=" + ColHighlight + ">" + Escape(manifest.Host)
+                    + ':' + Escape(manifest.Port) + "</color>");
+            }
+            else if (manifest.IsCrossplay)
+            {
+                Row(sb, "Joining", "by crossplay code -- on the world's page");
+            }
+
+            // Where the password is, never what it is. The manifest carries no password by
+            // design; see writeClientManifest() in the engine for why.
+            Row(sb, "Password", "on the world's page");
+
+            return sb.ToString();
+        }
+
         internal static string BuildBodyText(LaunchPayload payload, List<string> mods, bool listIsSeparate = false)
         {
             var sb = new StringBuilder();
@@ -896,7 +1028,11 @@ namespace PhValheimCompanion
         // to appear is a player with no route back to the dialog.
         private void OnGUI()
         {
-            if (!_closedByPlayer || ConnectFlow.Connecting || !LaunchPayload.Present) return;
+            // Either mode can be reopened. The gate used to be LaunchPayload.Present alone,
+            // which was right when that was the only reason the dialog existed; with the
+            // launch-help notice it would have left that player's only route back missing.
+            if (!_closedByPlayer || ConnectFlow.Connecting) return;
+            if (!LaunchPayload.Present && !ClientManifest.Present) return;
 
             try
             {
@@ -914,7 +1050,13 @@ namespace PhValheimCompanion
             const float h = 34f;
             var rect = new Rect((Screen.width - w) / 2f, Screen.height - h - 24f, w, h);
 
-            if (GUI.Button(rect, $"Connect to {LaunchPayload.Current.World}"))
+            // "Connect to X" would be a promise the help notice cannot keep -- it has no
+            // password and therefore no connect path. The label names what the button opens.
+            var label = LaunchPayload.Present
+                ? $"Connect to {LaunchPayload.Current.World}"
+                : $"PhValheim: {ClientManifest.Current.World}";
+
+            if (GUI.Button(rect, label))
             {
                 _closedByPlayer = false;
                 _shown = true;

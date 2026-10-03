@@ -35,6 +35,7 @@
     <Compile Include="phvalheim-backend.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="LaunchPayload.cs" />
+    <Compile Include="ClientManifest.cs" />
     <Compile Include="ConnectDialog.cs" />
     <Compile Include="ModListView.cs" />
     <Compile Include="ConnectFlow.cs" />
