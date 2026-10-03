@@ -466,7 +466,12 @@ namespace PhValheimCompanion
 
             // "Connect to X" only where connecting is actually possible. The notice has no
             // password, so in that mode the button opens the notice and says so.
-            var label = ReopenButtonLabel(LaunchPayload.Present ? "Connect to" : "PhValheim:", world);
+            // "Connect:" in BOTH modes, Brian's call. The two differ in what the click does -- with a
+            // payload it joins, with only a manifest it reopens the notice -- but the player's
+            // intent is the same either way, and two different words for one entry read as a bug.
+            // The notice itself is where the distinction gets explained, which is the right place
+            // for it: there is room for a sentence there and none on a menu row.
+            var label = ReopenButtonLabel("Connect:", world);
 
             _nativeButtonOk = MenuButton.Ensure(label, OnReopenRequested);
         }
@@ -479,7 +484,7 @@ namespace PhValheimCompanion
         //
         // Escape() on the world name is not decoration: this string is TMP rich text, so a
         // world called "a<b" would otherwise swallow the rest of the label as a malformed tag
-        // and the button would read "PhValheim: a" -- the same hazard as the dialog body, in a
+        // and the button would read "Connect: a" -- the same hazard as the dialog body, in a
         // place where there is far less text to lose.
         //
         // internal static so dev_tools/renderDialog can assert both colours are actually in
@@ -776,7 +781,7 @@ namespace PhValheimCompanion
             // blocking, with a way back. Nothing about the launch is lost -- the payload is
             // still on the command line, so Show() can be called again unchanged.
             _closedByPlayer = true;
-            Main.StaticLogger.LogMessage("Connect dialog closed. Use the PhValheim button on the main menu to bring it back.");
+            Main.StaticLogger.LogMessage("Connect dialog closed. Use the Connect entry on the main menu to bring it back.");
         }
 
         // YesNoPopup's click handlers call the callback and nothing else -- they do not close
@@ -1599,8 +1604,8 @@ namespace PhValheimCompanion
             // "Connect to X" would be a promise the help notice cannot keep -- it has no
             // password and therefore no connect path. The label names what the button opens.
             var label = LaunchPayload.Present
-                ? $"Connect to {LaunchPayload.Current.World}"
-                : $"PhValheim: {ClientManifest.Current.World}";
+                ? $"Connect: {LaunchPayload.Current.World}"
+                : $"Connect: {ClientManifest.Current.World}";
 
             if (GUI.Button(rect, label))
             {

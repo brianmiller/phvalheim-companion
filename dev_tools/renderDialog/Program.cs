@@ -547,13 +547,13 @@ namespace RenderDialog
 
             // The label. Same string must be a no-op; TMP rebuilds its mesh on assignment.
             fails += Expect("label: unchanged is skipped",
-                !(bool)lab.Invoke(null, new object[] { "PhValheim: VOXYLADY", "PhValheim: VOXYLADY" }),
+                !(bool)lab.Invoke(null, new object[] { "Connect: VOXYLADY", "Connect: VOXYLADY" }),
                 "re-setting an identical label re-meshes TMP every frame");
             fails += Expect("label: changed is applied",
-                (bool)lab.Invoke(null, new object[] { "PhValheim: OLD", "PhValheim: NEW" }),
+                (bool)lab.Invoke(null, new object[] { "Connect: OLD", "Connect: NEW" }),
                 "a changed world name must reach the button");
             fails += Expect("label: first application happens",
-                (bool)lab.Invoke(null, new object[] { null, "PhValheim: VOXYLADY" }),
+                (bool)lab.Invoke(null, new object[] { null, "Connect: VOXYLADY" }),
                 "a freshly built clone must get its label or it reads Start Game");
 
             return fails;
@@ -567,7 +567,7 @@ namespace RenderDialog
         //
         // It also runs operator data (the world name) through TMP markup, which is the same
         // hazard the dialog body has: a world called "a<b" would swallow the remainder and the
-        // button would read "PhValheim: a".
+        // button would read "Connect: a".
         private static int ReopenButtonLabelColours(Type dialog)
         {
             Console.WriteLine();
@@ -581,11 +581,11 @@ namespace RenderDialog
                 return 1;
             }
 
-            string label = (string)m.Invoke(null, new object[] { "PhValheim:", "VOXYLADY" });
+            string label = (string)m.Invoke(null, new object[] { "Connect:", "VOXYLADY" });
             Console.WriteLine($"    rendered: {label}");
 
             int fails = 0;
-            fails += Expect("magenta prefix", label.Contains("<color=#ff00ff>PhValheim:</color>"),
+            fails += Expect("magenta prefix", label.Contains("<color=#ff00ff>Connect:</color>"),
                 "the prefix is magenta and closed");
             fails += Expect("cyan world", label.Contains("<color=#22d3ee>VOXYLADY</color>"),
                 "the world name is --accent-primary and closed");
@@ -597,7 +597,7 @@ namespace RenderDialog
                 $"two opened and two closed (got {opens}/{closes})");
 
             // The world name is operator data going into markup.
-            string nasty = (string)m.Invoke(null, new object[] { "PhValheim:", "a<b>c" });
+            string nasty = (string)m.Invoke(null, new object[] { "Connect:", "a<b>c" });
             fails += Expect("world name escaped",
                 !nasty.Contains("<b>") && nasty.Contains("</color>"),
                 "angle brackets in a world name cannot open a tag of their own");
