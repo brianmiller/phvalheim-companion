@@ -295,6 +295,13 @@ namespace PhValheimCompanion
         // rather than one per frame at 60fps.
         private string _lastDecline;
 
+        // Whether the reopen button has been reported as drawn. One line, once, because the
+        // log already proves the dialog shows and closes but carries NO "button clicked" --
+        // and with nothing logged at draw time there is no way to tell a button that is drawn
+        // and ignoring clicks from a button that was never drawn at all. Those two need
+        // completely different fixes, so the log has to separate them.
+        private bool _buttonDrawReported;
+
         private void NoteDecline(string reason)
         {
             if (reason == _lastDecline) return;
@@ -1280,6 +1287,12 @@ namespace PhValheimCompanion
             const float w = 260f;
             const float h = 34f;
             var rect = new Rect((Screen.width - w) / 2f, Screen.height - h - 24f, w, h);
+
+            if (!_buttonDrawReported)
+            {
+                _buttonDrawReported = true;
+                Main.StaticLogger.LogMessage($"PhValheim reopen button drawn at {rect} (screen {Screen.width}x{Screen.height}).");
+            }
 
             // "Connect to X" would be a promise the help notice cannot keep -- it has no
             // password and therefore no connect path. The label names what the button opens.
