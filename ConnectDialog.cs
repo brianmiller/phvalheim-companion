@@ -169,7 +169,20 @@ namespace PhValheimCompanion
             }
 
             if (_shown || _closedByPlayer) return;
-            if (!LaunchPayload.Present) return;
+
+            // BOTH modes, or this component is attached and then does nothing.
+            //
+            // This line was LaunchPayload.Present alone and it is the third gate in the chain:
+            // FejdStartupPatch decides whether to attach, Show() decides which dialog to build,
+            // and THIS decides whether Show() is ever called. Updating the first two and
+            // missing this one is a Companion that loads, finds its manifest, builds nothing
+            // and says nothing -- which is precisely the silence the feature exists to end.
+            //
+            // It shipped that way in the first :rc and every cheap check passed: the dll
+            // contained all the new strings, the manifest was in the payload zip, eight verify
+            // markers were green. None of them could see that the path was unreachable.
+            // dev_tools/test-dialog-reachability.sh reads the IL of this method instead.
+            if (!LaunchPayload.Present && !ClientManifest.Present) return;
 
             // UnifiedPopup is not wired up for the first few frames of the main menu, and
             // pushing into it early silently does nothing. Waiting for IsAvailable() is why

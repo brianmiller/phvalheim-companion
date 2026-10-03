@@ -205,8 +205,35 @@ return 0;
 // publicized reference copy or a real un-publicized assembly. Hardcoding the publicized name
 // made every IL assertion report MISSING when pointed at a real assembly -- which reads as
 // "Valheim changed everything" rather than "the probe looked for the wrong file".
+// Which assembly the IL requests ("!Type.Method", "~field") read.
+//
+// Normally the game's, because that is what the probe was built for: finding out what a
+// Valheim method really does before patching it. But the same question gets asked of OUR OWN
+// code -- "does this method body actually consult ClientManifest, or does it only mention it
+// in a comment?" -- and a source grep cannot answer that. If the first argument names a .dll
+// instead of a directory, that file is the subject and references resolve from its folder.
+//
+// Added after shipping a dialog whose attach gate and body builder were both correct and whose
+// Update() still returned early, so Show() was never called. Every string the feature needs
+// was in the dll; the path to them was unreachable. Only the IL could tell the difference.
 static string ValheimAssembly(string libsDir)
 {
+    // APIPROBE_ASSEMBLY points the IL requests ("!Type.Method", "~field") at a different
+    // assembly while references still resolve from libsDir.
+    //
+    // Normally the subject is the game's assembly, because that is what the probe was built
+    // for: finding out what a Valheim method really does before patching it. But the same
+    // question gets asked of OUR OWN code -- "does this method body actually consult
+    // ClientManifest, or does it only mention it in a comment?" -- and no source grep can
+    // answer that.
+    //
+    // Added after shipping a dialog whose attach gate and body builder were both correct and
+    // whose Update() still returned early, so Show() was never called. Every string the
+    // feature needed was in the dll and eight verify markers were green; the path to them was
+    // unreachable. Only the IL could tell the difference.
+    var over = Environment.GetEnvironmentVariable("APIPROBE_ASSEMBLY");
+    if (!string.IsNullOrEmpty(over) && File.Exists(over)) return over;
+
     foreach (var name in new[] { "assembly_valheim_publicized.dll", "assembly_valheim.dll" })
     {
         var p = Path.Combine(libsDir, name);
