@@ -116,18 +116,35 @@ check ConnectDialog.OnGUI 'ClientManifest.get_Present' \
 	"after Close, a help-mode player would have no button to reopen the notice"
 
 echo
-echo "== the unused left button is hidden, AND put back =="
+echo "== one button, centred by the game, and every override put back =="
 
-check ConnectDialog.ShowLaunchHelp 'ConnectDialog.HideLeftButton' \
-	"the notice would show two buttons both labelled Close"
-check ConnectDialog.HideLeftButton 'SetActive' \
-	"nothing would actually hide it"
+# WarningPopup, not YesNoPopup. UnifiedPopup.ShowWarning activates buttonCenter and centres
+# it itself, which is why the notice needs no position nudge. The first attempt pushed a
+# YesNoPopup and hid the unused left button, leaving the right one where the right of a PAIR
+# goes -- off centre, and pulled further off by ButtonPull.
+check ConnectDialog.ShowLaunchHelp 'WarningPopup' \
+	"a YesNoPopup would put its single button in a two-button position: off centre"
+notcheck ConnectDialog.ShowLaunchHelp 'YesNoPopup' \
+	"the two-button popup is the connect dialog's, not the notice's"
 
-# THE DANGEROUS HALF. UnifiedPopup is a shared singleton: a left button left inactive is gone
-# from every later yes/no dialog in the game, vanilla's included. The hide is cosmetic; a
-# missing restore is a game-wide fault, so it is asserted separately from the hide.
-check ConnectDialog.RestorePopupSkin 'SetActive' \
-	"MISSING RESTORE: the left button would stay hidden on every later popup in the game"
+# The label lives on UnifiedPopup.okText -- the field ShowWarning localizes onto
+# buttonCenterText. Verified in its IL, not assumed.
+check ConnectDialog.ShowLaunchHelp 'ConnectDialog.ApplyOkLabel' \
+	"the button would keep Valheim's own OK label"
+
+# THE DANGEROUS HALF. UnifiedPopup is a shared singleton, so okText left overridden reads
+# "Close" on every later warning dialog in the session, vanilla's included.
+# Anchored on _savedOkText, not on SetPrivateField. RestorePopupSkin calls SetPrivateField for
+# yesText and noText as well, so the looser check passed a mutant with the okText restore
+# deleted -- it could not tell WHICH field was being put back. This field is read by nothing
+# else, so loading it is the restore.
+check ConnectDialog.RestorePopupSkin 'ConnectDialog._savedOkText' \
+	"MISSING RESTORE: okText would stay overridden, so every later warning dialog in the session reads Close"
+
+# The smaller panel. Both dialogs scale through one method so there is one place that sets it
+# and one that puts it back.
+check ConnectDialog.ApplyOkLabel 'ConnectDialog.ScalePanel' \
+	"the notice would be drawn in the connect dialog's much larger panel"
 
 # NEGATIVE: the download button is gone. settings.phvalheimClientURL is a single url whose
 # default has been a Windows .exe since 2.31, so on Linux or macOS it handed the player the

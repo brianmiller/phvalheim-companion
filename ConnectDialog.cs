@@ -84,6 +84,35 @@ namespace PhValheimCompanion
         // and reverses exactly.
         internal const float PanelScale = 2.0f;
 
+        // The launch-help notice gets a SMALLER panel, because it has a fraction of the content.
+        //
+        // PanelScale 2.0 exists for the connect dialog: eight lines of labelled table plus a
+        // scrolling mod list. The help notice is five lines and no list, and at 2.0 it was a
+        // vast box around a short sentence -- Brian's words, and he is right.
+        //
+        // Everything scales with the panel, so the body budget has to scale with it too: the
+        // inner height is proportional to the scale while the text stays a fixed SCREEN size.
+        //
+        // 1.5/2.0 of the connect dialog's 8 lines is 6, and 7 is that figure plus one line of
+        // slack for the one case that needs it: a very long host:port wraps its labelled row
+        // onto a second line, and withholding the address from a player who has to join by
+        // hand would be the wrong thing to trim. The proportionality is an ESTIMATE -- it comes
+        // from the panel's inner height scaling linearly, not from a measurement of this panel
+        // at 1.5 -- so 7 is the number to revisit first if the notice ever looks tight.
+        //
+        // Change one of these three numbers without the others and the notice silently starts
+        // overflowing again, which is the bug the render harness exists to catch.
+        internal const float HelpPanelScale = 1.5f;
+        private const int HelpBodyLineBudget = 7;
+
+        // Which scale the styling methods are currently working in.
+        //
+        // Set before any of them runs and read instead of PanelScale throughout, so one dialog
+        // can be laid out at 2.0 and the other at 1.5 without two copies of the arithmetic.
+        // Font sizes are SCREEN sizes divided by this, so they come out the same physical size
+        // in either panel -- that is the whole point of dividing rather than hardcoding.
+        private float _activeScale = PanelScale;
+
         // Screen-space sizes. Divide by PanelScale, never use directly.
         //
         // Previous effective body size was 18 * 1.75 = 31.5 screen units. 22 is a ~30% cut, and
@@ -121,7 +150,10 @@ namespace PhValheimCompanion
 
         // Readable at 1080p and up, and deliberately a constant rather than a percentage --
         // see ApplyPopupSkin for why percentages of Valheim's own body size were unreadable.
-        private const float BodyFontSize = BodyScreenSize / PanelScale;
+        // Runtime, not const: it depends on which panel is being laid out. As a const it was
+        // silently the 2.0 value in both dialogs, which made the help notice's text half the
+        // intended screen size in a 1.5 panel.
+        private float BodyFontSize => BodyScreenSize / _activeScale;
 
         private Vector3 _savedPanelScale;
         private bool _panelScaled;
@@ -138,20 +170,32 @@ namespace PhValheimCompanion
         private Vector2 _savedLeftPos, _savedRightPos;
         private bool _buttonsStyled;
 
-        // The launch-help notice has ONE action, so its left button is hidden rather than
-        // given a second job.
+        // The launch-help notice has ONE action, so it is a WarningPopup -- Valheim's own
+        // single-button popup, whose button the game centres itself.
         //
-        // It used to offer "Get the app", opening settings.phvalheimClientURL -- which is a
-        // single URL for a setting whose default has pointed at a Windows .exe since 2.31.
-        // On Linux or macOS that button hands the player the wrong installer, and picking the
-        // right one per platform is a problem the server cannot solve from one text field.
-        // Brian's call: drop it.
+        // It used to offer a second button, "Get the app", opening settings.phvalheimClientURL
+        // -- a single URL for a setting whose default has pointed at a Windows .exe since 2.31,
+        // so on Linux or macOS it handed the player the wrong installer. Picking the right one
+        // per platform is not something the server can do from one text field. Brian's call:
+        // drop it.
         //
-        // Restored in RestorePopupSkin like every other change made here. This is the shared
-        // UnifiedPopup singleton: a left button left inactive would vanish from every later
-        // yes/no dialog in the game, which is a worse bug than the one being fixed.
-        private bool _leftButtonHidden;
-        private bool _savedLeftActive;
+        // okText is restored like every other field touched here. This is the shared
+        // UnifiedPopup singleton, so a label left behind lands on every later warning in the
+        // session -- "Close" on a dialog that meant "OK".
+        private string _savedOkText;
+        private bool _okTextOverridden;
+
+        // Which dialog is on screen. Read by ApplyChromeStyle to decide whether the live
+        // button is buttonCenter (WarningPopup) or the left/right pair (YesNoPopup). Derived
+        // from a flag rather than from _activeScale, so changing a scale cannot silently
+        // change which buttons get styled.
+        private bool _helpMode;
+
+        // The centre button's own transform and label size, saved for the same reason.
+        private Vector3 _savedCenterScale;
+        private float _savedCenterTextSize;
+        private bool _savedCenterAutoSize;
+        private bool _centerStyled;
 
         // Rect geometry, saved separately from the text styling above: these move Valheim's own
         // layout, so a missed restore is the most visible leak of the lot.
@@ -362,25 +406,29 @@ namespace PhValheimCompanion
 
             try
             {
-                // One action, one button. Both slots are wired to OnClose because YesNoPopup
-                // demands two callbacks; the left one is then hidden below, after the push.
-                ApplyPopupSkin(yesLabel: "Close", noLabel: "Close");
+                // WarningPopup, not YesNoPopup. Valheim's OWN single-button popup.
+                //
+                // UnifiedPopup.ShowWarning sets buttonCenterText from UnifiedPopup.okText,
+                // activates buttonCenter and wires its onClick -- verified in its IL, not
+                // assumed. So the one button is centred by the game's own layout.
+                //
+                // The first attempt pushed a YesNoPopup and hid the unused left button, which
+                // left the right one sitting where the right of a PAIR goes: off centre, and
+                // pulled further off by ButtonPull. Centring it by hand would have meant
+                // another screen-space nudge to maintain, on the shared singleton, when the
+                // game already has the layout we want.
+                _helpMode = true;
+                _activeScale = HelpPanelScale;
+                ApplyOkLabel("Close");
 
-                UnifiedPopup.Push(new YesNoPopup(
+                UnifiedPopup.Push(new WarningPopup(
                     "PhValheim",
                     BuildLaunchHelpBody(manifest),
-                    OnClose,     // yes slot -> right button -> "Close"
-                    OnClose,     // no  slot -> left  button -> hidden
-                    false,
-                    true));
+                    OnClose,
+                    false));
 
                 ApplyChromeStyle();
                 ApplyBodyStyle();
-
-                // AFTER the push, for the same reason ApplyBodyStyle is: the panel's objects
-                // are not live until the popup is active, and reaching for buttonLeft before
-                // that silently finds nothing and leaves both buttons on screen.
-                HideLeftButton();
             }
             catch (Exception e)
             {
@@ -390,27 +438,26 @@ namespace PhValheimCompanion
             }
         }
 
-        // Hide the left button of the shared popup, remembering what it was.
+        // The centre button's label, and the panel scale, both live on the shared singleton.
         //
-        // Failure is logged, not thrown: the notice with two Close buttons is untidy, while a
-        // notice that did not appear is the bug this whole feature exists to fix.
-        private void HideLeftButton()
+        // okText is the field UnifiedPopup.ShowWarning localizes onto buttonCenterText, so it
+        // is the only way to label that button -- and like yesText/noText it must be put back,
+        // or every later warning in the session says "Close" where it meant "OK".
+        private void ApplyOkLabel(string label)
         {
-            try
+            var popup = PopupInstance();
+            if (popup == null)
             {
-                var popup = PopupInstance();
-                if (popup == null) return;
-                if (!Utils.TryGetFieldValue(popup, "buttonLeft", out var lBtn)) return;
-                if (!(lBtn is Button buttonLeft) || buttonLeft.gameObject == null) return;
+                Main.StaticLogger.LogWarning("Dialog layout: UnifiedPopup.instance not reachable -- the button keeps Valheim's own label.");
+            }
+            else if (Utils.TryGetFieldValue(popup, "okText", out var okObj))
+            {
+                _savedOkText = okObj as string;
+                Utils.SetPrivateField(popup, "okText", label);
+                _okTextOverridden = true;
+            }
 
-                _savedLeftActive = buttonLeft.gameObject.activeSelf;
-                _leftButtonHidden = true;
-                buttonLeft.gameObject.SetActive(false);
-            }
-            catch (Exception e)
-            {
-                Main.StaticLogger.LogWarning($"Dialog layout: could not hide the unused left button ({e.GetType().Name}); it will read \"Close\" as well.");
-            }
+            ScalePanel();
         }
 
         private void OnConnect()
@@ -498,22 +545,34 @@ namespace PhValheimCompanion
             // Saved and restored with everything else here for the same reason the labels are:
             // this is the shared UnifiedPopup singleton, so a scale left behind would make
             // every later confirm dialog in the session oversized.
-            if (Utils.TryGetFieldValue(popup, "popupUIParent", out var parentObj)
+            ScalePanel();
+
+            // Valheim's own popups are one or two centred sentences. Ours is a labelled table,
+            // which wants top-left. TMP_Text.alignment is TextMeshPro's own public API; only
+            // the UnifiedPopup FIELD holding the component is private, hence the reflected read.
+            //
+        }
+
+        // The panel's localScale, at whatever _activeScale currently is.
+        //
+        // Shared by both dialogs so there is one place that scales the panel and one place that
+        // puts it back. The connect dialog runs at PanelScale, the help notice at the smaller
+        // HelpPanelScale, and the only difference between them is the field read here.
+        private void ScalePanel()
+        {
+            var popup = PopupInstance();
+            if (popup != null
+                && Utils.TryGetFieldValue(popup, "popupUIParent", out var parentObj)
                 && parentObj is GameObject panel && panel.transform != null)
             {
                 _savedPanelScale = panel.transform.localScale;
-                panel.transform.localScale = _savedPanelScale * PanelScale;
+                panel.transform.localScale = _savedPanelScale * _activeScale;
                 _panelScaled = true;
             }
             else
             {
                 Main.StaticLogger.LogWarning("Dialog layout: UnifiedPopup.popupUIParent not found -- the panel stays its original size.");
             }
-
-            // Valheim's own popups are one or two centred sentences. Ours is a labelled table,
-            // which wants top-left. TMP_Text.alignment is TextMeshPro's own public API; only
-            // the UnifiedPopup FIELD holding the component is private, hence the reflected read.
-            //
         }
 
         // THE BODY STYLE IS APPLIED AFTER UnifiedPopup.Push, AND THAT IS THE WHOLE FIX.
@@ -606,7 +665,7 @@ namespace PhValheimCompanion
                 _savedHeaderAutoSize = header.enableAutoSizing;
                 _headerStyled = true;
                 header.enableAutoSizing = false;
-                header.fontSize = HeaderScreenSize / PanelScale;
+                header.fontSize = HeaderScreenSize / _activeScale;
 
                 // Lift the title toward the top edge. +y is up in Unity UI regardless of how the
                 // rect is anchored, so this does not depend on knowing the prefab's anchors.
@@ -615,7 +674,7 @@ namespace PhValheimCompanion
                     _savedHeaderPos = header.rectTransform.anchoredPosition;
                     _headerMoved = true;
                     header.rectTransform.anchoredPosition =
-                        _savedHeaderPos + new Vector2(0f, HeaderLiftScreen / PanelScale);
+                        _savedHeaderPos + new Vector2(0f, HeaderLiftScreen / _activeScale);
                 }
             }
             else
@@ -623,9 +682,39 @@ namespace PhValheimCompanion
                 Main.StaticLogger.LogWarning("Dialog layout: UnifiedPopup.headerText not found -- the title stays panel-sized.");
             }
 
+            // The help notice is a WarningPopup, so the live button is buttonCenter and the
+            // left/right pair is inactive. Styling the pair there would set sizes on two hidden
+            // objects and leave the one the player can see at Valheim's own size -- the
+            // mismatch would read as a rendering fault, which is exactly what the "both buttons
+            // or neither" rule below exists to avoid.
+            //
+            // No position nudge: ShowWarning's single button is already centred by the game.
+            // ButtonPull exists only to close the gap a PAIR gets after being scaled down.
+            if (_helpMode)
+            {
+                if (Utils.TryGetFieldValue(popup, "buttonCenterText", out var cObj) && cObj is TMP_Text centerText
+                    && Utils.TryGetFieldValue(popup, "buttonCenter", out var cBtn) && cBtn is Button buttonCenter
+                    && buttonCenter.transform != null)
+                {
+                    _savedCenterTextSize = centerText.fontSize;
+                    _savedCenterAutoSize = centerText.enableAutoSizing;
+                    _savedCenterScale = buttonCenter.transform.localScale;
+                    _centerStyled = true;
+
+                    centerText.enableAutoSizing = false;
+                    centerText.fontSize = ButtonTextScreenSize / _activeScale;
+                    buttonCenter.transform.localScale = _savedCenterScale * ButtonScale;
+
+                    Main.StaticLogger.LogMessage($"Dialog layout: centre button is size={centerText.fontSize} scale={buttonCenter.transform.localScale.x:0.00} (wanted {ButtonTextScreenSize / _activeScale}/{ButtonScale:0.00}).");
+                }
+                else
+                {
+                    Main.StaticLogger.LogWarning("Dialog layout: UnifiedPopup.buttonCenter not found -- Close stays panel-sized.");
+                }
+            }
             // Both buttons or neither. A half-applied pair would leave Connect and Close
             // visibly different sizes, which reads as a rendering fault rather than a style.
-            if (Utils.TryGetFieldValue(popup, "buttonLeftText", out var lObj) && lObj is TMP_Text leftText
+            else if (Utils.TryGetFieldValue(popup, "buttonLeftText", out var lObj) && lObj is TMP_Text leftText
                 && Utils.TryGetFieldValue(popup, "buttonRightText", out var rObj) && rObj is TMP_Text rightText
                 && Utils.TryGetFieldValue(popup, "buttonLeft", out var lBtn) && lBtn is Button buttonLeft
                 && Utils.TryGetFieldValue(popup, "buttonRight", out var rBtn) && rBtn is Button buttonRight
@@ -641,8 +730,8 @@ namespace PhValheimCompanion
 
                 leftText.enableAutoSizing = false;
                 rightText.enableAutoSizing = false;
-                leftText.fontSize = ButtonTextScreenSize / PanelScale;
-                rightText.fontSize = ButtonTextScreenSize / PanelScale;
+                leftText.fontSize = ButtonTextScreenSize / _activeScale;
+                rightText.fontSize = ButtonTextScreenSize / _activeScale;
                 buttonLeft.transform.localScale = _savedLeftScale * ButtonScale;
                 buttonRight.transform.localScale = _savedRightScale * ButtonScale;
 
@@ -657,13 +746,13 @@ namespace PhValheimCompanion
                 {
                     _savedLeftPos = lRect.anchoredPosition;
                     _savedRightPos = rRect.anchoredPosition;
-                    float pull = ButtonPullScreen / PanelScale;
+                    float pull = ButtonPullScreen / _activeScale;
                     lRect.anchoredPosition = _savedLeftPos + new Vector2(pull, 0f);
                     rRect.anchoredPosition = _savedRightPos + new Vector2(-pull, 0f);
                 }
 
                 // Read back, not echo. See the body's log line for why.
-                Main.StaticLogger.LogMessage($"Dialog layout: buttons are size={rightText.fontSize} scale={buttonRight.transform.localScale.x:0.00} (wanted {ButtonTextScreenSize / PanelScale}/{ButtonScale:0.00}).");
+                Main.StaticLogger.LogMessage($"Dialog layout: buttons are size={rightText.fontSize} scale={buttonRight.transform.localScale.x:0.00} (wanted {ButtonTextScreenSize / _activeScale}/{ButtonScale:0.00}).");
             }
             else
             {
@@ -686,7 +775,7 @@ namespace PhValheimCompanion
                 _savedBodySize = br.sizeDelta;
                 _bodyMoved = true;
 
-                float lift = BodyLiftScreen / PanelScale;
+                float lift = BodyLiftScreen / _activeScale;
                 br.sizeDelta = _savedBodySize + new Vector2(0f, lift);
                 br.anchoredPosition = _savedBodyPos + new Vector2(0f, lift * 0.5f);
 
@@ -700,19 +789,39 @@ namespace PhValheimCompanion
         {
             var popup = PopupInstance();
 
-            // FIRST, and unconditionally once set. Everything else here is cosmetic; a left
-            // button left inactive disappears from every later yes/no dialog in the game --
-            // including vanilla's own -- which is a worse fault than the one it was hidden for.
-            if (_leftButtonHidden)
+            // The centre button's label, put back before anything else. Left overridden it
+            // reads "Close" on every later warning dialog in the session, vanilla's included.
+            if (_okTextOverridden)
             {
-                _leftButtonHidden = false;
-                if (popup != null
-                    && Utils.TryGetFieldValue(popup, "buttonLeft", out var hidden)
-                    && hidden is Button leftBtn && leftBtn.gameObject != null)
+                _okTextOverridden = false;
+                if (popup != null) Utils.SetPrivateField(popup, "okText", _savedOkText);
+            }
+
+            if (_centerStyled)
+            {
+                _centerStyled = false;
+                if (popup != null)
                 {
-                    leftBtn.gameObject.SetActive(_savedLeftActive);
+                    if (Utils.TryGetFieldValue(popup, "buttonCenter", out var cBtn)
+                        && cBtn is Button buttonCenter && buttonCenter.transform != null)
+                    {
+                        buttonCenter.transform.localScale = _savedCenterScale;
+                    }
+                    if (Utils.TryGetFieldValue(popup, "buttonCenterText", out var ctObj)
+                        && ctObj is TMP_Text centerText)
+                    {
+                        centerText.fontSize = _savedCenterTextSize;
+                        centerText.enableAutoSizing = _savedCenterAutoSize;
+                    }
                 }
             }
+
+            _helpMode = false;
+
+            // Back to the connect dialog's scale for whatever is shown next. Left at the help
+            // notice's 1.5, a later Connect dialog would be laid out in a panel a quarter
+            // smaller than its body budget assumes -- and that budget is a hard constraint.
+            _activeScale = PanelScale;
 
             if (_labelsOverridden)
             {
@@ -861,13 +970,14 @@ namespace PhValheimCompanion
             sb.Append("<size=115%><b><color=").Append(ColHighlight).Append('>')
               .Append(Escape(manifest.World)).Append("</color></b></size>\n");
 
-            // EVERY LINE COSTS. BodyLineBudget is 8 rendered lines at BodyFontSize, a blank
-            // line costs one of them, and a sentence past the wrap width costs two. The first
-            // draft of this body explained both causes in full prose and came to FIFTEEN --
+            // EVERY LINE COSTS, AND THIS BODY'S BUDGET IS SIX, NOT EIGHT.
+            //
+            // The notice is laid out at HelpPanelScale, a smaller panel than the connect
+            // dialog's, so it holds proportionally fewer lines at the same text size. A blank
+            // line costs one of the six and a sentence past the wrap width costs two. The first
+            // draft explained both causes in full prose and came to FIFTEEN;
             // dev_tools/renderDialog caught it, which is the only reason it is not a screenshot
-            // of a notice running off the bottom of the panel. Keep it to six.
-            sb.Append('\n');
-
+            // of text running off the bottom of the panel.
             sb.Append("Nothing handed Valheim a world to join.\n");
 
             // States the requirement without asserting the player has failed it. The Companion

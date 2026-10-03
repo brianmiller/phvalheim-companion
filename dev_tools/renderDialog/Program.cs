@@ -23,6 +23,12 @@ namespace RenderDialog
         // to the top of the rect, so it is much tighter than the full-panel one.
         private static int _lineBudgetWithList;
 
+        // The launch-help notice is laid out in a SMALLER panel (ConnectDialog.HelpPanelScale),
+        // so it holds fewer lines at the same text size. Checking it against the connect
+        // dialog's budget of 8 would pass a body that then runs off the bottom -- the same
+        // mistake as conflating the with-list and without-list budgets, one panel over.
+        private static int _helpLineBudget;
+
         // The body column is roughly this many characters wide at BodyFontSize in Valheim's
         // popup. Used to predict WRAPPING, which is what actually drives height: a single
         // logical line of 200 characters costs three rendered lines, and counting '\n' alone
@@ -90,6 +96,16 @@ namespace RenderDialog
                 return 1;
             }
             _lineBudgetWithList = (int)budgetWithList.GetRawConstantValue();
+
+            FieldInfo helpBudget = dialog.GetField("HelpBodyLineBudget",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (helpBudget == null)
+            {
+                Console.Error.WriteLine("FAIL  ConnectDialog.HelpBodyLineBudget not found -- the launch-help layouts "
+                    + "would be checked against the connect dialog's larger budget, which is the bug this constant exists to catch.");
+                return 1;
+            }
+            _helpLineBudget = (int)helpBudget.GetRawConstantValue();
 
             MethodInfo parse = payloadType.GetMethod("Parse",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
@@ -178,7 +194,10 @@ namespace RenderDialog
                     "vanilla=0", "crossplay=1", "minClientVersion=2.0.14",
                 });
 
-            failures += RenderHelp(asm, dialog, "LAUNCH HELP: worst case long name",
+            // The host here is 51 characters, which pushes the labelled Address row onto a
+            // second line. That is the case HelpBodyLineBudget's spare line pays for; a
+            // homelab hostname this long is unusual but entirely real.
+            failures += RenderHelp(asm, dialog, "LAUNCH HELP: worst case long name + long host",
                 new[]
                 {
                     "world=AVeryLongWorldNameThatSomebodyWillAbsolutelyUse",
@@ -191,6 +210,7 @@ namespace RenderDialog
             failures += RenderHelp(asm, dialog, "LAUNCH HELP: no minClientVersion in the manifest",
                 new[] { "world=Bare", "host=h.example.com", "port=25000" });
 
+            failures += ScaleBudgetRelation(dialog);
             failures += ManifestParserChecks(asm);
 
             Console.WriteLine(failures == 0
@@ -330,13 +350,13 @@ namespace RenderDialog
             string body = (string)buildHelp.Invoke(null, new object[] { manifest });
 
             int rendered = CountRenderedLines(body);
-            bool over = rendered > _lineBudget;
+            bool over = rendered > _helpLineBudget;
             if (over) failures++;
 
             Console.WriteLine();
             Console.WriteLine($"--- {label} ---");
             Console.WriteLine(Visualise(body));
-            Console.WriteLine($"    rendered lines: {rendered} (budget {_lineBudget}) {(over ? "<<< OVER BUDGET" : "ok")}");
+            Console.WriteLine($"    rendered lines: {rendered} (help budget {_helpLineBudget}) {(over ? "<<< OVER BUDGET" : "ok")}");
 
             // CONTENT ASSERTIONS. The budget alone would pass on an empty body.
             bool crossplay = (bool)manifestType.GetProperty("IsCrossplay").GetValue(manifest);
@@ -446,6 +466,43 @@ namespace RenderDialog
                 "an empty crossplay flag is not crossplay, so the address still shows");
 
             return failures;
+        }
+
+        // The help notice's three numbers have to agree with each other.
+        //
+        // HelpBodyLineBudget is a constant, so nothing above can see it drift away from
+        // HelpPanelScale: setting the help scale back to 2.0 leaves every layout "within
+        // budget" while the panel is twice the size the budget was chosen for, and setting it
+        // to 1.0 leaves the notice overflowing a panel the harness still calls fine. Caught by
+        // mutation -- that exact change produced zero failures before this check existed.
+        //
+        // The relation is the one in ConnectDialog's comment: inner height scales linearly with
+        // the panel, so the budget tracks BodyLineBudget * HelpPanelScale / PanelScale, plus at
+        // most one line of deliberate slack for a wrapped address row.
+        private static int ScaleBudgetRelation(Type dialog)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- help panel scale vs budget ---");
+
+            FieldInfo ps = dialog.GetField("PanelScale", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo hps = dialog.GetField("HelpPanelScale", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (ps == null || hps == null)
+            {
+                Console.WriteLine("    FAIL  PanelScale or HelpPanelScale not found -- the relation is untested.");
+                return 1;
+            }
+
+            float panel = (float)ps.GetRawConstantValue();
+            float help = (float)hps.GetRawConstantValue();
+
+            int derived = (int)Math.Floor(_lineBudget * help / panel);
+            bool ok = _helpLineBudget >= derived && _helpLineBudget <= derived + 1;
+
+            Console.WriteLine($"    PanelScale={panel} HelpPanelScale={help} BodyLineBudget={_lineBudget} "
+                + $"-> derived {derived}..{derived + 1}, HelpBodyLineBudget={_helpLineBudget}");
+
+            return Expect("relation", ok,
+                $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
         }
 
         private static int Expect(string label, bool ok, string what)
