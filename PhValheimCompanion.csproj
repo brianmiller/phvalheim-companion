@@ -38,6 +38,7 @@
     <Compile Include="LaunchPayload.cs" />
     <Compile Include="ClientManifest.cs" />
     <Compile Include="MenuButton.cs" />
+    <Compile Include="PanelSkin.cs" />
     <Compile Include="ConnectDialog.cs" />
     <Compile Include="ModListView.cs" />
     <Compile Include="ConnectFlow.cs" />

@@ -32,19 +32,47 @@ namespace PhValheimCompanion
         //
         // Counting what the old layout cost: 1 name + 1 method + 1 blank + 1 count + 4 mods +
         // 1 blank + 2 wrapped sentence = 11 lines. The panel fits about 8.
-        private const int BodyLineBudget = 8;
+        //
+        // 8 -> 7 when BodyLiftScreen came down from 110 to 86 to put padding above the title:
+        // the body rect's top edge is raised by that lift and its bottom does not move, so 24
+        // screen units off the lift is 24 units off the body's height, which is one line at
+        // BodyScreenSize. The three numbers move together -- see HeaderLiftScreen.
+        private const int BodyLineBudget = 7;
 
         // When the scrolling list is up it takes the BOTTOM 45% of the body's rect, so the
         // summary rows only have the top 55% to live in. Checking those layouts against the
         // full-panel budget of 8 would pass a body that then renders straight through the list
         // -- which is exactly what the screenshot showed.
-        private const int BodyLineBudgetWithList = 5;
+        private const int BodyLineBudgetWithList = 4;
 
         // Mods are joined onto a shared line and capped by CHARACTER length, not by count.
         // A count cap cannot hold a height budget: twelve short names and twelve long ones are
         // the same count and a very different number of rendered lines, which is exactly how
         // the old MaxModsListed = 12 let a long list overflow.
         private const int ModLineBudgetChars = 86;
+
+        // The failure notice gets ONE line, and it is capped by characters for the same reason
+        // the mod list is: a message long enough to wrap costs a second line, and in list mode
+        // the whole body only has four.
+        //
+        // There was no cap at all until the budgets tightened -- the layout harness's own test
+        // string calls itself "exactly eighty characters, which is the documented cap", which
+        // documented a constant that did not exist, and an 80-character message duly wrapped
+        // and pushed both failed-join layouts over. Nothing enforced the number the test was
+        // named after.
+        //
+        // Truncating a diagnostic is a real loss, so it is a deliberate trade and not a tidy-up:
+        // the full text always goes to the BepInEx log, and in the dialog the player's question
+        // is "did it work?", not "what was the exact error?". Losing the tail of the message is
+        // better than losing the world name off the top of the panel.
+        //
+        // 56 and not 58: the rendered line is the "⚠ " marker plus this, and the body wraps at
+        // 58. The first attempt at this cap was 68 -- a number with nothing behind it -- and it
+        // clipped the message while still wrapping, so both failed-join layouts stayed over
+        // budget and the clip LOOKED like it had worked. dev_tools/renderDialog asserts the
+        // relation against its own wrap width now, so this constant cannot drift back.
+        internal const int FailureMarkerChars = 2;           // "⚠ "
+        internal const int FailureLineBudgetChars = 56;
 
         private bool _shown;
         private bool _closedByPlayer;
@@ -61,6 +89,11 @@ namespace PhValheimCompanion
         private float _savedBodyFontSize;
         private bool _savedBodyAutoSize;
         private Vector4 _savedBodyMargin;
+        // The body's BASE colour. Every coloured run in the body carries its own <color=> tag,
+        // but the plain prose between them -- "Nothing handed Valheim a world to join." -- was
+        // inheriting Valheim's parchment cream, which is the wrong colour against a slate
+        // panel. This is what the web UI calls --text-primary.
+        private Color _savedBodyColor;
         private bool _bodyStyleOverridden;
 
         // THE PANEL AND ITS CONTENTS ARE SIZED INDEPENDENTLY, AND THAT IS THE WHOLE FIX.
@@ -103,7 +136,7 @@ namespace PhValheimCompanion
         // Change one of these three numbers without the others and the notice silently starts
         // overflowing again, which is the bug the render harness exists to catch.
         internal const float HelpPanelScale = 1.5f;
-        private const int HelpBodyLineBudget = 7;
+        private const int HelpBodyLineBudget = 6;
 
         // Which scale the styling methods are currently working in.
         //
@@ -144,8 +177,24 @@ namespace PhValheimCompanion
         // ButtonScale shrank each one about its own pivot, which WIDENED the gap between their
         // facing edges -- the spacing complaint is a direct consequence of the size fix, not a
         // separate problem.
-        private const float HeaderLiftScreen = 60f;
-        private const float BodyLiftScreen   = 110f;
+        // THE HEADER LIFT AND THE BODY LIFT MOVE TOGETHER, AND THAT IS NOT OPTIONAL.
+        //
+        // Brian: "add a little padding above the PhValheim string in the dialog." The title was
+        // lifted 60 screen units toward the top edge, which left it almost touching it -- one
+        // round earlier it had been lifted so far it was partially OUTSIDE the panel, and 60
+        // was the value that pulled it back in rather than a value chosen for how it looked.
+        //
+        // Dropping the header by 24 on its own would close the gap between the title and the
+        // body by exactly 24, because the body's top edge is raised by its OWN lift and knows
+        // nothing about the header's. The two would eventually collide, which is the same class
+        // of bug as the original overflow: nothing errors, the text just draws through itself.
+        //
+        // So both come down by the same 24. The header↔body gap is preserved exactly, the
+        // padding appears above the title, and the cost is 24 screen units of body height --
+        // which is why the line budgets below dropped by one at the same time. Change one of
+        // these without the other two and the render harness fails, by design.
+        private const float HeaderLiftScreen = 36f;
+        private const float BodyLiftScreen   = 86f;
         private const float ButtonPullScreen = 70f;
 
         // THESE THREE ARE POSITIONS, NOT SIZES, AND THEY SCALE DIFFERENTLY FROM FONTS.
@@ -188,6 +237,10 @@ namespace PhValheimCompanion
         private Color _savedHeaderColor;
         private float _savedLeftTextSize, _savedRightTextSize;
         private bool _savedLeftAutoSize, _savedRightAutoSize;
+        // The button LABELS' colour, saved alongside their size. The faces are recoloured by
+        // PanelSkin, which restores its own work; these are TMP components the skin does not
+        // touch, so they are this class's to put back like everything else on the singleton.
+        private Color _savedLeftTextColor, _savedRightTextColor;
         private Vector3 _savedLeftScale, _savedRightScale;
         private Vector2 _savedLeftPos, _savedRightPos;
         private bool _buttonsStyled;
@@ -217,6 +270,7 @@ namespace PhValheimCompanion
         private Vector3 _savedCenterScale;
         private float _savedCenterTextSize;
         private bool _savedCenterAutoSize;
+        private Color _savedCenterTextColor;
         private bool _centerStyled;
 
         // Rect geometry, saved separately from the text styling above: these move Valheim's own
@@ -768,7 +822,10 @@ namespace PhValheimCompanion
             _savedBodyFontSize = body.fontSize;
             _savedBodyAutoSize = body.enableAutoSizing;
             _savedBodyMargin = body.margin;
+            _savedBodyColor = body.color;
             _bodyStyleOverridden = true;
+
+            if (ColorUtility.TryParseHtmlString(Theme.TextBody, out var bodyTint)) body.color = bodyTint;
 
             // Both axes, explicitly. `alignment` is the combined enum; verticalAlignment is the
             // single axis that actually went wrong, and setting it on its own leaves no doubt
@@ -813,6 +870,17 @@ namespace PhValheimCompanion
         {
             var popup = PopupInstance();
             if (popup == null) return;
+
+            // The BOX, before anything in it. Here and not in ScalePanel for the same reason
+            // the body style is here: ScalePanel runs before UnifiedPopup.Push on the help
+            // path, when the panel is inactive and every rect still measures zero -- and
+            // PanelSkin picks out the background art BY RECT AREA, so it would find nothing
+            // and quietly leave the panel brown.
+            if (Utils.TryGetFieldValue(popup, "popupUIParent", out var skinParent)
+                && skinParent is GameObject skinPanel)
+            {
+                PanelSkin.Apply(skinPanel);
+            }
 
             if (Utils.TryGetFieldValue(popup, "headerText", out var headerObj) && headerObj is TMP_Text header)
             {
@@ -861,11 +929,13 @@ namespace PhValheimCompanion
                     _savedCenterTextSize = centerText.fontSize;
                     _savedCenterAutoSize = centerText.enableAutoSizing;
                     _savedCenterScale = buttonCenter.transform.localScale;
+                    _savedCenterTextColor = centerText.color;
                     _centerStyled = true;
 
                     centerText.enableAutoSizing = false;
                     centerText.fontSize = ButtonTextScreenSize / _activeScale;
                     buttonCenter.transform.localScale = _savedCenterScale * ButtonScale;
+                    if (ColorUtility.TryParseHtmlString(Theme.Button, out var centerTint)) centerText.color = centerTint;
 
                     Main.StaticLogger.LogMessage($"Dialog layout: centre button is size={centerText.fontSize} scale={buttonCenter.transform.localScale.x:0.00} (wanted {ButtonTextScreenSize / _activeScale}/{ButtonScale:0.00}).");
                 }
@@ -888,12 +958,19 @@ namespace PhValheimCompanion
                 _savedRightAutoSize = rightText.enableAutoSizing;
                 _savedLeftScale = buttonLeft.transform.localScale;
                 _savedRightScale = buttonRight.transform.localScale;
+                _savedLeftTextColor = leftText.color;
+                _savedRightTextColor = rightText.color;
                 _buttonsStyled = true;
 
                 leftText.enableAutoSizing = false;
                 rightText.enableAutoSizing = false;
                 leftText.fontSize = ButtonTextScreenSize / _activeScale;
                 rightText.fontSize = ButtonTextScreenSize / _activeScale;
+                if (ColorUtility.TryParseHtmlString(Theme.Button, out var labelTint))
+                {
+                    leftText.color = labelTint;
+                    rightText.color = labelTint;
+                }
                 buttonLeft.transform.localScale = _savedLeftScale * ButtonScale;
                 buttonRight.transform.localScale = _savedRightScale * ButtonScale;
 
@@ -951,6 +1028,12 @@ namespace PhValheimCompanion
         {
             var popup = PopupInstance();
 
+            // The box first. PanelSkin hid Valheim's background art and inserted objects of its
+            // own, so a missed restore here is not a wrong colour on the next dialog -- it is
+            // vanilla's "Remove this character?" rendered inside OUR panel, with its art still
+            // invisible. The most visible leak available.
+            PanelSkin.Restore();
+
             // The centre button's label, put back before anything else. Left overridden it
             // reads "Close" on every later warning dialog in the session, vanilla's included.
             if (_okTextOverridden)
@@ -974,6 +1057,7 @@ namespace PhValheimCompanion
                     {
                         centerText.fontSize = _savedCenterTextSize;
                         centerText.enableAutoSizing = _savedCenterAutoSize;
+                        centerText.color = _savedCenterTextColor;
                     }
                 }
             }
@@ -1017,6 +1101,7 @@ namespace PhValheimCompanion
                     body.fontSize = _savedBodyFontSize;
                     body.enableAutoSizing = _savedBodyAutoSize;
                     body.margin = _savedBodyMargin;
+                    body.color = _savedBodyColor;
                 }
             }
 
@@ -1042,11 +1127,13 @@ namespace PhValheimCompanion
                     {
                         leftText.fontSize = _savedLeftTextSize;
                         leftText.enableAutoSizing = _savedLeftAutoSize;
+                        leftText.color = _savedLeftTextColor;
                     }
                     if (Utils.TryGetFieldValue(popup, "buttonRightText", out var rObj) && rObj is TMP_Text rightText)
                     {
                         rightText.fontSize = _savedRightTextSize;
                         rightText.enableAutoSizing = _savedRightAutoSize;
+                        rightText.color = _savedRightTextColor;
                     }
                     // The scales are restored independently of the text: a button left at 0.62
                     // on every later dialog is the most visible way this could leak.
@@ -1183,7 +1270,12 @@ namespace PhValheimCompanion
             // design; see writeClientManifest() in the engine for why.
             Row(sb, "Password", "on the world's page");
 
-            return sb.ToString();
+            // Trim the trailing newline, exactly as BuildBodyText does -- and this body never
+            // did. Row() ends every line with '\n', so the last row left a dangling blank that
+            // is a REAL rendered line, and in a six-line panel a wasted line is the one that
+            // pushes a wrapped address off the bottom. The connect dialog had this fixed; the
+            // help notice was written afterwards and did not inherit it.
+            return sb.ToString().TrimEnd('\n');
         }
 
         internal static string BuildBodyText(LaunchPayload payload, List<string> mods, bool listIsSeparate = false)
@@ -1212,7 +1304,8 @@ namespace PhValheimCompanion
             if (!string.IsNullOrEmpty(ConnectFlow.LastFailure))
             {
                 sb.Append("<color=").Append(ColWarn).Append(">⚠ ")
-                  .Append(Escape(ConnectFlow.LastFailure)).Append("</color>\n");
+                  .Append(Clip(Escape(ConnectFlow.LastFailure), FailureLineBudgetChars))
+                  .Append("</color>\n");
                 if (!listIsSeparate) sb.Append('\n');
             }
 
@@ -1347,6 +1440,20 @@ namespace PhValheimCompanion
         {
             if (string.IsNullOrEmpty(s)) return "";
             return s.Replace('<', ' ').Replace('>', ' ');
+        }
+
+        // Hard character cap with an ellipsis, so an over-long string costs one line and not
+        // two. Applied AFTER Escape, never before: Escape only substitutes characters, so it
+        // cannot change the length, and clipping first would let a trailing '<' survive into
+        // the markup.
+        //
+        // The ellipsis is one character, so the result is never longer than the cap -- a clip
+        // that overshot its own budget would be worse than no clip at all.
+        private static string Clip(string s, int max)
+        {
+            if (string.IsNullOrEmpty(s) || s.Length <= max) return s;
+            if (max <= 1) return "…";
+            return s.Substring(0, max - 1) + "…";
         }
 
         // The way back in, after Close. Drawn with IMGUI rather than built as a uGUI button

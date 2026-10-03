@@ -211,6 +211,7 @@ namespace RenderDialog
                 new[] { "world=Bare", "host=h.example.com", "port=25000" });
 
             failures += ScaleBudgetRelation(dialog);
+            failures += FailureClipFitsOneLine(dialog);
             failures += NudgeInvariance(dialog);
             failures += ManifestParserChecks(asm);
 
@@ -504,6 +505,39 @@ namespace RenderDialog
 
             return Expect("relation", ok,
                 $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
+        }
+
+        // THE FAILURE NOTICE'S CAP HAS TO FIT ON ONE LINE, WHICH IS NOT THE SAME AS BEING SMALL.
+        //
+        // The cap exists so the notice costs one line instead of two. The first value chosen
+        // for it was 68 against a wrap width of 58 -- so it clipped the message, printed an
+        // ellipsis, and still wrapped. Both failed-join layouts stayed over budget while the
+        // clip looked like it was working, which is the exact shape of a check that cannot see
+        // the bug: the ellipsis was visible evidence of something that had not been achieved.
+        //
+        // The layout cases above would catch a regression only while a long-enough failure
+        // message happens to be in one of them. This is the arithmetic, so it holds whatever
+        // the cases contain.
+        private static int FailureClipFitsOneLine(Type dialog)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- failure notice cap vs wrap width ---");
+
+            FieldInfo capField = dialog.GetField("FailureLineBudgetChars", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo markerField = dialog.GetField("FailureMarkerChars", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (capField == null || markerField == null)
+            {
+                Console.WriteLine("    FAIL  FailureLineBudgetChars or FailureMarkerChars not found -- the cap is untested.");
+                return 1;
+            }
+
+            int cap = (int)capField.GetRawConstantValue();
+            int marker = (int)markerField.GetRawConstantValue();
+
+            Console.WriteLine($"    cap={cap} + marker={marker} = {cap + marker}, wrap width {WrapChars}");
+
+            return Expect("cap", cap + marker <= WrapChars,
+                $"a clipped failure message plus its marker ({cap + marker}) fits the {WrapChars}-char wrap width");
         }
 
         // A POSITION NUDGE MUST NOT CHANGE WITH THE PANEL SCALE.

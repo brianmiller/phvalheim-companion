@@ -191,6 +191,61 @@ notcheck ConnectDialog.ShowLaunchHelp 'OpenURL' \
 	"a single client url cannot be right for every platform -- the button was removed"
 
 echo
+echo "== the BOX is skinned, and the skin cannot eat a click =="
+
+# Brian: "the styling added to the dialog is really just the blue text. The entire thing,
+# including the box background, buttons and border should be in PhValheim's style."
+check ConnectDialog.ApplyChromeStyle 'PanelSkin.Apply' \
+	"the panel would keep Valheim's brown parchment art and only the text would be themed"
+
+# In ApplyChromeStyle and NOT in ScalePanel. PanelSkin picks the background art out by RECT
+# AREA, and on the help path ScalePanel runs BEFORE UnifiedPopup.Push, when every rect still
+# measures zero -- it would find nothing and leave the panel brown, silently.
+notcheck ConnectDialog.ScalePanel 'PanelSkin' \
+	"ScalePanel runs pre-Push on the help path, when every rect is zero and no art can be found"
+
+# THE DANGEROUS ONE, and it is the same bug as the reopen button one layer up: the backdrop
+# covers the ENTIRE panel, so an Image left as a raycast target swallows every click in the
+# dialog -- Connect and Close included. A popup that draws perfectly and cannot be dismissed.
+check PanelSkin.AddQuad 'set_raycastTarget' \
+	"CLICK BLOCKER: a full-panel Image left as a raycast target makes every button in the dialog dead"
+
+# Hiding Valheim's art is only safe because it is put back. Left hidden, vanilla's "Remove
+# this character?" renders with no background at all -- unreadable over the main menu.
+check ConnectDialog.RestorePopupSkin 'PanelSkin.Restore' \
+	"MISSING RESTORE: Valheim's own popups would keep our backdrop and their art would stay invisible"
+
+# Order inside Restore: colours before objects. A destroyed GameObject's Image is null, so
+# restoring colours afterwards throws partway down the list and leaves the rest skinned.
+check PanelSkin.Restore 'Destroy' \
+	"the inserted backdrop and border would survive onto every later popup in the session"
+
+# The body's base colour. Every coloured run carries its own tag, but the plain prose between
+# them inherited Valheim's parchment cream, which is wrong against a slate panel.
+check ConnectDialog.RestorePopupSkin 'ConnectDialog._savedBodyColor' \
+	"MISSING RESTORE: the body colour would leak onto every later popup in the session"
+
+echo
+echo "== the reopen button has more than one way to find a template =="
+
+# The gray-button round: Ensure() returned false and the ONE return that did it logged
+# nothing, so there was no way to tell from the log which gate refused.
+check MenuButton.Ensure 'MenuButton.Warn' \
+	"a refusal would be silent again, which is what made the last round unfalsifiable"
+
+check MenuButton.Ensure 'MenuButton.FindTemplate' \
+	"the reflected m_menuButtons read would be the only route to a template"
+
+# The fallback routes. m_menuButtons is the one step here a game update can break silently;
+# the menu demonstrably HAS buttons whenever it is on screen, so a hierarchy search cannot
+# come up empty on a menu the player is looking at.
+check MenuButton.FindTemplate 'GetComponentsInChildren' \
+	"with m_menuButtons empty or renamed there would be no second route and no native button"
+
+check MenuButton.Ensure 'MenuButton.Skin' \
+	"the button would keep Valheim's own colours -- Brian's 'the Connect button is still gray'"
+
+echo
 echo "== controls: the manifest must NOT have leaked everywhere =="
 
 # If every method consulted the manifest, the checks above would pass for a build in which the

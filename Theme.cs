@@ -19,9 +19,21 @@
     // appears verbatim in the assembly, which is what makes it checkable from outside.
     internal static class Theme
     {
-        internal const string Accent   = "#22d3ee";   // --accent-primary    cyan 400
-        internal const string Muted    = "#94a3b8";   // --text-secondary    slate 400
-        internal const string Warn     = "#fbbf24";   // --warning           amber 400
-        internal const string Button   = "#a78bfa";   // --accent-secondary  violet 400
+        internal const string Accent      = "#22d3ee";   // --accent-primary          cyan 400
+        internal const string AccentHover = "#67e8f9";   // --accent-hover            cyan 300
+        internal const string Muted       = "#94a3b8";   // --text-secondary          slate 400
+        internal const string Warn        = "#fbbf24";   // --warning                 amber 400
+        internal const string Button      = "#a78bfa";   // --accent-secondary        violet 400
+
+        // The chrome: the box itself, rather than the words in it.
+        //
+        // Brian's note on the first theming pass was exact -- "the styling added to the dialog
+        // is really just the blue text". The panel was still Valheim's brown parchment art,
+        // which is the largest thing on screen and so decides what the dialog reads as. These
+        // four are what PanelSkin paints it with.
+        internal const string PanelFill  = "#0f172a";   // --bg-primary     slate 900, the box
+        internal const string PanelEdge  = "#22d3ee";   // --accent-primary cyan 400,  the border
+        internal const string ButtonFill = "#334155";   // --bg-tertiary    slate 700, button faces
+        internal const string TextBody   = "#f1f5f9";   // --text-primary   slate 100, body text
     }
 }
