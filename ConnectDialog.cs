@@ -401,23 +401,57 @@ namespace PhValheimCompanion
         // IMGUI input works it is better than nothing, and it costs one branch.
         private bool _nativeButtonOk;
 
+        // WHETHER THE BUTTON SHOULD BE ON SCREEN. Pure and static, so it can be put through a
+        // truth table with no game -- and that is the whole point of it existing separately.
+        //
+        // THE BUG IT EXISTS TO PIN. This predicate used to be written inline and included
+        // `&& !_shown`. OnClose sets _closedByPlayer but has never cleared _shown, and _shown
+        // is set true just before the dialog is pushed -- so after a close it is true forever
+        // and the condition was ALWAYS false. MenuButton.Ensure was therefore never called
+        // once, and OnGUI's gray fallback drew instead, because its own gate does not mention
+        // _shown. One wrong term, and it accounted for every symptom Brian reported across
+        // four rounds: a gray button (the IMGUI decoy), a dead button (IMGUI gets no clicks on
+        // his client), and -- the tell I should have asked for sooner -- NOT ONE "Menu button:"
+        // line in his log, success or failure, when every path through Ensure logs.
+        //
+        // WHY THE IL TEST COULD NOT SEE IT. dev_tools/test-dialog-reachability.sh asserts that
+        // Update calls ManageReopenButton and that ManageReopenButton calls MenuButton.Ensure.
+        // Both calls are genuinely in the IL. The call was reachable; the BRANCH was not. A
+        // call list cannot distinguish those two, which is exactly why this is now a function
+        // with inputs and a return value that a test can drive directly.
+        //
+        // `shown` is accepted and DELIBERATELY IGNORED. It is in the signature so the harness
+        // can assert that passing shown=true still yields true -- deleting the parameter would
+        // make the regression untestable again, which is how it got here.
+        internal static bool WantsReopenButton(bool closedByPlayer, bool shown, bool connecting,
+                                               bool popupVisible, bool menuActive)
+        {
+            if (!closedByPlayer) return false;   // nothing to reopen
+            if (connecting) return false;        // a join is in flight; the watchdog owns this
+            if (popupVisible) return false;      // another dialog is up, ours included
+            if (!menuActive) return false;       // not on the main menu
+            return true;
+        }
+
         private void ManageReopenButton()
         {
-            bool wanted = _closedByPlayer && !ConnectFlow.Connecting && !_shown;
-
-            if (wanted)
+            bool popupVisible, menuActive;
+            try
             {
-                try
-                {
-                    if (FejdStartup.instance == null || UnifiedPopup.IsVisible()) wanted = false;
-                }
-                catch
-                {
-                    wanted = false;
-                }
+                // FejdStartup.instance going null is "no menu", which IsMainMenuActive already
+                // reports as inactive -- so it folds into menuActive rather than being a
+                // fourth term that can disagree with it.
+                popupVisible = FejdStartup.instance == null || UnifiedPopup.IsVisible();
+                menuActive = IsMainMenuActive();
+            }
+            catch
+            {
+                popupVisible = true;
+                menuActive = false;
             }
 
-            if (wanted && !IsMainMenuActive()) wanted = false;
+            bool wanted = WantsReopenButton(_closedByPlayer, _shown, ConnectFlow.Connecting,
+                                            popupVisible, menuActive);
 
             if (!wanted)
             {
@@ -923,6 +957,7 @@ namespace PhValheimCompanion
                 && treeParent is GameObject treePanel)
             {
                 PanelTree.LogOnce(treePanel);
+                PanelSkin.Apply(treePanel);
             }
 
             if (Utils.TryGetFieldValue(popup, "headerText", out var headerObj) && headerObj is TMP_Text header)
@@ -1070,6 +1105,11 @@ namespace PhValheimCompanion
         private void RestorePopupSkin()
         {
             var popup = PopupInstance();
+
+            // The tint, put back before anything else. It creates no objects, so this is only
+            // colours -- but they are colours on the shared UnifiedPopup singleton, so left
+            // behind they land on vanilla's "Remove this character?" too.
+            PanelSkin.Restore();
 
 
             // The centre button's label, put back before anything else. Left overridden it

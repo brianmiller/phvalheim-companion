@@ -212,6 +212,8 @@ namespace RenderDialog
 
             failures += ScaleBudgetRelation(dialog);
             failures += FailureClipFitsOneLine(dialog);
+            failures += ReopenButtonPredicate(dialog);
+            failures += PanelBackgroundSelector(asm);
             failures += NudgeInvariance(dialog);
             failures += ManifestParserChecks(asm);
 
@@ -505,6 +507,127 @@ namespace RenderDialog
 
             return Expect("relation", ok,
                 $"HelpBodyLineBudget ({_helpLineBudget}) is in {derived}..{derived + 1} for a {help} panel");
+        }
+
+        // THE PANEL SELECTOR, DRIVEN WITH THE REAL TREE.
+        //
+        // Every row below is a literal entry from Brian's client log. The first reskin
+        // attempt picked the panel as "largest Image under popupUIParent" and produced a
+        // full-screen box with a border and no text -- these are the objects it was choosing
+        // between, and the two it must reject are both screen-sized:
+        //
+        //   popupUIParent="PopupBlockingBackground" rect=1920x1200 screen=1920x1200
+        //     [PopupBlockingBackground 1920x1200 sprite=none]
+        //     [FullscreenBlocker       1920x1200 sprite=load_bkg INACTIVE]
+        //     [Popup/bkg                 420x320 sprite=woodpanel_512x512]   <-- the panel
+        //
+        // The last row is the guard on its own: even an object correctly NAMED bkg under Popup
+        // is refused if it measures the whole screen, because that is the shape of the mistake.
+        private static int PanelBackgroundSelector(Assembly companion)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- panel background selector ---");
+
+            Type skin = companion.GetType("PhValheimCompanion.PanelSkin");
+            MethodInfo m = skin?.GetMethod("IsPanelBackground",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public,
+                null,
+                new[] { typeof(string), typeof(string), typeof(float), typeof(float), typeof(float) },
+                null);
+            if (m == null)
+            {
+                Console.WriteLine("    FAIL  PanelSkin.IsPanelBackground(string,string,float,float,float) not found --");
+                Console.WriteLine("          the selector is untestable, which is the state the full-screen box shipped in.");
+                return 1;
+            }
+
+            const float screen = 1920f * 1200f;
+            var rows = new[]
+            {
+                new { n = "bkg", p = "Popup", w = 420f, h = 320f, want = true,
+                      why = "the real panel, from the log" },
+                new { n = "PopupBlockingBackground", p = "UnifiedPopup", w = 1920f, h = 1200f, want = false,
+                      why = "THE OBJECT THE BROKEN VERSION PICKED: a full-screen click blocker" },
+                new { n = "FullscreenBlocker", p = "PopupBlockingBackground", w = 1920f, h = 1200f, want = false,
+                      why = "the other screen-sized blocker" },
+                new { n = "ButtonOk", p = "Popup", w = 179f, h = 45f, want = false,
+                      why = "a button is tinted via its own path, not as the background" },
+                new { n = "bkg", p = "SomethingElse", w = 420f, h = 320f, want = false,
+                      why = "right name, wrong parent" },
+                new { n = "bkg", p = "Popup", w = 1920f, h = 1200f, want = false,
+                      why = "THE GUARD: correctly named but screen-sized, so still refused" },
+                new { n = "bkg", p = "Popup", w = 0f, h = 0f, want = false,
+                      why = "not laid out yet -- rects are zero before the popup is activated" },
+            };
+
+            int fails = 0;
+            foreach (var r in rows)
+            {
+                bool got = (bool)m.Invoke(null, new object[] { r.n, r.p, r.w, r.h, screen });
+                bool ok = got == r.want;
+                Console.WriteLine($"    {(ok ? "ok   " : "FAIL ")} {r.p}/{r.n} {r.w:0}x{r.h:0} -> {got} (want {r.want})");
+                if (!ok) { Console.WriteLine($"           {r.why}"); fails++; }
+            }
+            return fails;
+        }
+
+        // THE REOPEN BUTTON'S PREDICATE, AS A TRUTH TABLE.
+        //
+        // This is the test that four rounds of reopen-button bugs needed and did not have.
+        //
+        // The predicate used to be an inline expression including `&& !_shown`. _shown is set
+        // true before the dialog is pushed and OnClose never clears it, so after a close the
+        // condition was always false: MenuButton.Ensure was never called once, and the dead
+        // IMGUI fallback drew instead. Brian reported a gray button that did nothing three
+        // times, and his log contained NO "Menu button:" line at all -- which was the evidence
+        // that Ensure was not merely failing but never running.
+        //
+        // The IL reachability test asserted Update -> ManageReopenButton -> MenuButton.Ensure
+        // and passed throughout, because all three calls really were in the IL. A call list
+        // cannot see that a branch is unreachable. Only driving the predicate can.
+        //
+        // The first row is the one that matters: the exact state after OnClose.
+        private static int ReopenButtonPredicate(Type dialog)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--- reopen button predicate ---");
+
+            MethodInfo m = dialog.GetMethod("WantsReopenButton",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (m == null)
+            {
+                Console.WriteLine("    FAIL  ConnectDialog.WantsReopenButton not found -- the predicate is untested,");
+                Console.WriteLine("          which is the state in which the !_shown bug survived four rounds.");
+                return 1;
+            }
+
+            // closedByPlayer, shown, connecting, popupVisible, menuActive -> want
+            var rows = new[]
+            {
+                new { c = true,  s = true,  g = false, v = false, a = true,  want = true,
+                      why = "THE REGRESSION: state immediately after OnClose, which sets closedByPlayer and leaves shown TRUE" },
+                new { c = true,  s = false, g = false, v = false, a = true,  want = true,
+                      why = "reopened once already, closed again" },
+                new { c = false, s = false, g = false, v = false, a = true,  want = false,
+                      why = "never closed, so there is nothing to reopen" },
+                new { c = true,  s = true,  g = true,  v = false, a = true,  want = false,
+                      why = "a join is in flight; the watchdog owns the dialog" },
+                new { c = true,  s = true,  g = false, v = true,  a = true,  want = false,
+                      why = "another popup is on screen" },
+                new { c = true,  s = true,  g = false, v = false, a = false, want = false,
+                      why = "not on the main menu" },
+            };
+
+            int fails = 0;
+            foreach (var r in rows)
+            {
+                bool got = (bool)m.Invoke(null, new object[] { r.c, r.s, r.g, r.v, r.a });
+                bool ok = got == r.want;
+                Console.WriteLine($"    {(ok ? "ok   " : "FAIL ")} closed={r.c} shown={r.s} connecting={r.g} popup={r.v} menu={r.a} -> {got} (want {r.want})");
+                if (!ok) { Console.WriteLine($"           {r.why}"); fails++; }
+            }
+
+            return fails;
         }
 
         // THE FAILURE NOTICE'S CAP HAS TO FIT ON ONE LINE, WHICH IS NOT THE SAME AS BEING SMALL.

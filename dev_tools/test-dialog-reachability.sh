@@ -199,8 +199,18 @@ echo "== the panel tree is REPORTED, not guessed at =="
 check ConnectDialog.ApplyChromeStyle 'PanelTree.LogOnce' \
 	"the popup's Image tree would still be unknown, and the next reskin another guess"
 
-notcheck ConnectDialog.ApplyChromeStyle 'PanelSkin' \
-	"PanelSkin identified the background by SIZE and produced a full-screen box over the text"
+check ConnectDialog.ApplyChromeStyle 'PanelSkin.Apply' \
+	"the panel would keep Valheim's brown parchment and only the text would be themed"
+
+check ConnectDialog.RestorePopupSkin 'PanelSkin.Restore' \
+	"MISSING RESTORE: the tint would land on vanilla's own popups for the rest of the session"
+
+# THE GUARANTEE THAT MAKES THE SECOND ATTEMPT SAFE. The first reskin INSERTED a quad, and the
+# quad landed over the dialog's text -- a full screen with a border and nothing readable. This
+# version only writes Image.color. If PanelSkin ever gains an Instantiate it has reacquired
+# the exact failure mode that made the dialog unusable.
+notcheck PanelSkin.Apply 'Instantiate' \
+	"an inserted object can cover the text; the tint-only version cannot, and that is the point"
 
 # NEGATIVE, and this is the one with teeth: a read-only reporter must not instantiate or
 # recolour anything. If PanelTree ever grows an Instantiate it has stopped being a diagnostic.
