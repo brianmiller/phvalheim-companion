@@ -394,7 +394,11 @@ fi
 say ""
 say "== a disconnect is not reported as a failure =="
 
-watchdog_body=$(sed -n '/internal static bool NoticeMainMenu/,/^        }/p' ConnectFlow.cs)
+# Decide(), not NoticeMainMenu(): the decision was split out of it so a harness could run it
+# without Unity's clock (Time.realtimeSinceStartup is an extern and throws out of process).
+# NoticeMainMenu is now a one-line wrapper, so scanning it left this whole block blind -- which
+# it reported as a FAILURE rather than a pass, which is the only reason the move was noticed.
+watchdog_body=$(sed -n '/internal static bool Decide(bool mainMenuActive/,/^        }/p' ConnectFlow.cs)
 
 # THE LIFETIME CHECK. This is the one that matters, and its absence is why the first fix
 # shipped doing nothing.
@@ -438,7 +442,7 @@ fi
 if printf '%s\n' "$watchdog_body" | grep -q 'Player.m_localPlayer'; then
 	bad "disconnect" "NoticeMainMenu reads Player.m_localPlayer again -- that method cannot run while the player is in the world, so this check can only ever be false and reads as protection that is not there"
 else
-	pass "NoticeMainMenu does not try to observe the join itself (it cannot run then)"
+	pass "Decide does not try to observe the join itself (it cannot run then)"
 fi
 
 # The success branch must come BEFORE the Fail call, or a successful join still falls through
@@ -447,7 +451,7 @@ joined_line=$(printf '%s\n' "$watchdog_body" | grep -n 'if (_joined)' | head -1 
 fail_line=$(printf '%s\n' "$watchdog_body" | grep -n 'Fail("Could not connect' | head -1 | cut -d: -f1)
 
 if [ -z "$joined_line" ] || [ -z "$fail_line" ]; then
-	bad "disconnect" "could not find both the _joined branch and the Fail call in NoticeMainMenu -- this check cannot tell whether a disconnect still reports a failure, so treat it as failing"
+	bad "disconnect" "could not find both the _joined branch and the Fail call in Decide -- this check cannot tell whether a disconnect still reports a failure, so treat it as failing"
 elif [ "$joined_line" -lt "$fail_line" ]; then
 	pass "the successful-join branch is checked before the failure path"
 else
@@ -485,6 +489,30 @@ elif [ "$longest" -le 70 ]; then
 	pass "longest failure notice template is $longest chars (cap 70)"
 else
 	bad "failure notices" "a template is $longest chars; over 70 it wraps to a third line and overflows the body in list mode. Shorten it -- do not raise the cap."
+fi
+
+# LastNotice goes through the SAME Clip(…, FailureLineBudgetChars) as a failure, but it is not
+# a Fail() call, so the check above is blind to it. Mine was 93 characters when first written
+# and would have rendered as 55 plus an ellipsis -- cut off mid-word, in the one line whose job
+# is to tell the player what to do next.
+#
+# Capped at the budget itself (56), not at 70: a notice has no {token} to expand at runtime, so
+# what is in the source is what gets clipped. The budget is read out of ConnectDialog.cs rather
+# than written here twice -- a second copy is how a cap drifts away from the thing it caps.
+budget=$(grep -oE 'FailureLineBudgetChars = [0-9]+' ../ConnectDialog.cs 2>/dev/null \
+         || grep -oE 'FailureLineBudgetChars = [0-9]+' ConnectDialog.cs)
+budget=${budget##* }
+longestNotice=$(grep -oE 'LastNotice = "[^"]+"' ConnectFlow.cs | sed 's/LastNotice = "//; s/"$//' \
+                | awk '{ print length($0) }' | sort -rn | head -1)
+
+if [ -z "$budget" ]; then
+	bad "cancel notices" "could not read FailureLineBudgetChars from ConnectDialog.cs -- this check is now blind"
+elif [ -z "$longestNotice" ]; then
+	pass "no LastNotice assignments to measure"
+elif [ "$longestNotice" -le "$budget" ]; then
+	pass "longest cancel notice is $longestNotice chars (budget $budget)"
+else
+	bad "cancel notices" "a notice is $longestNotice chars against a budget of $budget; Clip() will cut it mid-word with an ellipsis. Shorten the string."
 fi
 
 say ""

@@ -297,6 +297,12 @@ namespace PhValheimCompanion
             // meant it never ran once a join had started -- the one circumstance it is for.
             if (ConnectFlow.Connecting)
             {
+                // BEFORE the watchdog, every frame. ProceedJoinRequest shows character select
+                // without touching the network, so this is the difference between "the player
+                // pressed Back" and "the join died" -- and the watchdog decides on the frame
+                // the main menu reappears, by which time the screen is already gone.
+                ConnectFlow.NoticeCharacterSelect(IsCharacterSelectActive());
+
                 if (ConnectFlow.NoticeMainMenu(IsMainMenuActive()))
                 {
                     // Offer the dialog again rather than only the reopen button. The player
@@ -571,6 +577,32 @@ namespace PhValheimCompanion
         private static bool IsMainMenuActive()
         {
             return TryIsMainMenuActive(out bool active) && active;
+        }
+
+        // Is the character select screen up?
+        //
+        // This is the screen ProceedJoinRequest shows instead of connecting -- it queues the
+        // join and waits for OnCharacterStart(). Observing it is what lets the watchdog tell a
+        // player who pressed Back from a join that actually died on the network.
+        //
+        // Readable from here, unlike whether the join landed: m_characterSelectScreen belongs
+        // to FejdStartup, which is alive for as long as that screen is up. The scene change
+        // that destroys this component is the one JoinSentry exists for.
+        //
+        // Fails CLOSED: a reflection error reads as "not on character select", so a hiccup can
+        // only ever cost the softer message, never invent a cancel for a join that failed.
+        private static bool IsCharacterSelectActive()
+        {
+            try
+            {
+                if (FejdStartup.instance == null) return false;
+                var screen = Utils.GetPrivateField<GameObject>(FejdStartup.instance, "m_characterSelectScreen");
+                return screen != null && screen.activeInHierarchy;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private bool IsReadyToShow()
@@ -1416,6 +1448,18 @@ namespace PhValheimCompanion
                   .Append("</color>\n");
                 if (!listIsSeparate) sb.Append('\n');
             }
+            // A cancel, which is NOT a failure and must not be dressed as one. Same slot and
+            // same budget -- it answers the same "what happened?" -- but muted and with no
+            // warning glyph, because the answer is "you did that on purpose". They are
+            // mutually exclusive by construction (Fail clears one, the cancel branch the
+            // other), so this cannot add a second line to the height budget.
+            else if (!string.IsNullOrEmpty(ConnectFlow.LastNotice))
+            {
+                sb.Append("<color=").Append(ColMuted).Append('>')
+                  .Append(Clip(Escape(ConnectFlow.LastNotice), FailureLineBudgetChars))
+                  .Append("</color>\n");
+                if (!listIsSeparate) sb.Append('\n');
+            }
 
             // The world name, full width. Deliberately NOT a table row: names run long
             // ("ModdedCrossplayPublished" is a real one), and a long value in a narrow column
@@ -1512,7 +1556,13 @@ namespace PhValheimCompanion
             // budget of 8 -- found by dev_tools/test-dialog-layout.sh, not by shipping it. When
             // the player is being told why their join failed, that message outranks the mod
             // names; the count still tells them their mods are installed.
+            //
+            // LastNotice counts for exactly the same reason: it occupies the same slot and the
+            // same two lines. Checking only LastFailure here would have put the overflow back
+            // for the cancel case alone -- a 10-line render against a budget of 8, which is
+            // the shape test-dialog-layout.sh exists to catch.
             if (!string.IsNullOrEmpty(ConnectFlow.LastFailure)) return;
+            if (!string.IsNullOrEmpty(ConnectFlow.LastNotice)) return;
 
             // The names on one wrapped line under the count, capped by width. Joining them is
             // what turned a four-line list into one and bought back the height the panel did

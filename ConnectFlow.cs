@@ -74,12 +74,41 @@ namespace PhValheimCompanion
         // indistinguishable. This is the missing bit of state, not an extra guard on top.
         private static bool _joined;
 
+        // Whether THIS attempt got as far as the character select screen.
+        //
+        // The THIRD case, and the reason the watchdog was still lying. Look at what
+        // ProceedJoinRequest actually does, quoted at the top of this file: it sets
+        // m_queuedJoinServer and then calls ShowCharacterSelection(). NOTHING HAS TOUCHED THE
+        // NETWORK YET -- JoinServer() only runs later, inside OnCharacterStart(), once the
+        // player has picked a character.
+        //
+        // So a player who clicks Connect, sees character select, and clicks Back has cancelled
+        // before any connection was attempted. The watchdog saw main-menu-up with _joined
+        // false, concluded the join had died, and told them "Could not connect. The world may
+        // still be starting." -- a diagnosis of a connection that was never made, about a
+        // server whose state we had not asked.
+        //
+        // Observed from ConnectDialog.Update, which is correct HERE and was wrong for _joined:
+        // the character select screen belongs to FejdStartup, which is still alive while it is
+        // up. The scene change that destroys the dialog's GameObject is the one _joined needed
+        // JoinSentry for.
+        private static bool _reachedCharacterSelect;
+
         // Called by JoinSentry, which is the only thing alive in the game scene to call it.
         internal static void NoticeJoined()
         {
             if (_joined) return;
             _joined = true;
             Main.StaticLogger.LogMessage("The join landed: the player is in the world.");
+        }
+
+        // Called every frame from ConnectDialog.Update while a join is in flight.
+        internal static void NoticeCharacterSelect(bool characterSelectActive)
+        {
+            if (!characterSelectActive || _reachedCharacterSelect) return;
+            _reachedCharacterSelect = true;
+            Main.StaticLogger.LogMessage(
+                "Character select is up: the join is queued and waiting for the player to pick a character.");
         }
 
         // Why the last attempt failed, in words a player can act on, or null if there has not
@@ -92,9 +121,18 @@ namespace PhValheimCompanion
         // threw -- the exception detail still goes to the log for me.
         internal static string LastFailure { get; private set; }
 
+        // The same channel for something that is NOT a failure.
+        //
+        // Kept separate from LastFailure rather than reusing it with softer wording, because
+        // the dialog styles a failure as a failure and the two are read differently -- and
+        // because one bug here has already been "a state that doubled as another state". A
+        // cancel sets this; a real failure sets LastFailure; a clean disconnect sets neither.
+        internal static string LastNotice { get; private set; }
+
         private static void Fail(string playerMessage, string logDetail = null)
         {
             LastFailure = playerMessage;
+            LastNotice = null;   // a failure is not also a cancel; never show both
             Connecting = false;
             Main.StaticLogger.LogError(logDetail ?? playerMessage);
         }
@@ -125,6 +163,19 @@ namespace PhValheimCompanion
         // up, so the dialog can put itself back.
         internal static bool NoticeMainMenu(bool mainMenuActive)
         {
+            return Decide(mainMenuActive, Time.realtimeSinceStartup);
+        }
+
+        // The decision, with the clock passed in.
+        //
+        // Split out so it can be RUN outside Unity. This three-way call has been wrong three
+        // times -- a disconnect reported as a failure, then a cancel reported as a failure --
+        // and none of those was visible to any test, because touching
+        // Time.realtimeSinceStartup from a harness throws "ECall methods must be packaged
+        // into a system module": it is an extern in the reference assembly. One parameter buys
+        // the whole decision table an oracle. See dev_tools/test-connect-outcomes.sh.
+        internal static bool Decide(bool mainMenuActive, float now)
+        {
             if (!Connecting) return false;
 
             // NOTE: _joined is NOT observed here, and must not be. This method only runs from
@@ -134,7 +185,7 @@ namespace PhValheimCompanion
             // fix and it shipped doing nothing. JoinSentry does the observing, from an object
             // that survives the scene change, and calls NoticeJoined().
             if (!mainMenuActive) return false;
-            if (Time.realtimeSinceStartup - _connectingSince < MenuReturnGraceSeconds) return false;
+            if (now - _connectingSince < MenuReturnGraceSeconds) return false;
 
             if (_joined)
             {
@@ -144,14 +195,43 @@ namespace PhValheimCompanion
                 // offered again -- rejoining is the likely next move -- but with NO notice.
                 Connecting = false;
                 LastFailure = null;
+                LastNotice = null;
                 Main.StaticLogger.LogMessage(
                     "Back at the main menu after a successful join: treating it as a disconnect, not a failure.");
+                return true;
+            }
+
+            if (_reachedCharacterSelect)
+            {
+                // CANCELLED, and reporting it as a failure was a claim about a connection that
+                // had not been attempted: ProceedJoinRequest only queues the join and shows
+                // character select, and JoinServer() does not run until OnCharacterStart().
+                // Back from that screen means the player changed their mind, and the honest
+                // answer names the step they stopped at rather than blaming the server.
+                //
+                // Not silent, unlike the disconnect case above. There the player knows what
+                // they did; here they pressed Back and the dialog reappearing with no
+                // explanation reads as the mod having failed at something.
+                Connecting = false;
+                LastFailure = null;
+                // 48 chars. The dialog clips this line at FailureLineBudgetChars (56) with an
+                // ellipsis, so a fuller sentence does not get a smaller font -- it gets cut
+                // off mid-word. The reason they are back here is on screen behind the dialog;
+                // what they need from this line is the one action that joins.
+                LastNotice = "Cancelled. Click Connect, then pick a character.";
+                Main.StaticLogger.LogMessage(
+                    "Back at the main menu from character select without joining: the player cancelled, "
+                    + "so no connection was ever attempted and none is being reported as failed.");
                 return true;
             }
 
             // The player gets told. This is the path Brian hit: Valheim gives up on its own,
             // with no exception and no callback, and the dialog used to just reappear as if
             // nothing had happened.
+            //
+            // Reachable only AFTER a character was picked, since the cancel branch above takes
+            // every other route back to the menu -- so "the world may still be starting" is
+            // now a statement about a join that really was attempted.
             Fail("Could not connect. The world may still be starting.",
                  "The join did not go through -- Valheim returned to the main menu by itself.");
             return true;
@@ -169,10 +249,15 @@ namespace PhValheimCompanion
             Connecting = true;
             _connectingSince = Time.realtimeSinceStartup;
             LastFailure = null;   // this attempt has not failed yet; do not show the last one
+            LastNotice = null;    // nor the last cancel
             // Per ATTEMPT, not per session. Left set from a previous successful join, a later
             // join that genuinely failed would be read as a disconnect and reported as nothing
             // at all -- the same bug as today with the sign flipped.
             _joined = false;
+            // Same reason, same trap in the other direction: left set from a previous attempt
+            // that stopped at character select, a join that later died on the network would be
+            // reported as "you cancelled" and the player would be told nothing was wrong.
+            _reachedCharacterSelect = false;
 
             // ZNet.RPC_ClientHandshake reads FejdStartup.ServerPassword during the handshake,
             // so setting it here is what stops the password prompt appearing for a world the

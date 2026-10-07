@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Drives ConnectFlow's watchdog OUTSIDE the game.
+
+       One signal, "the main menu is up again while a join was in flight", has three causes:
+       a disconnect, a cancel, and a real failure. Every bug in that file has been a cause the
+       state could not tell apart, and none of them is visible without running the decision.
+
+       No Reference elements, deliberately. Referencing libs at compile time shadows
+       System.Console (Unity ships its own mscorlib facade in there) and the probe fails to
+       build with CS0117 on Console.WriteLine. Same arrangement renderDialog uses: net8.0, no
+       references, the companion loaded at runtime and its dependencies resolved from libs. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>connectOutcomes</AssemblyName>
+    <RootNamespace>ConnectOutcomes</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+</Project>
