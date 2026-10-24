@@ -12,7 +12,7 @@ namespace PhValheimCompanion
         public const string MODNAME = "PhValheim Companion";
         public const string AUTHOR = "posixone";
         public const string GUID = "posixone_PhValheimCompanion";
-        public const string VERSION = "1.0.4";
+        public const string VERSION = "1.0.5";
 
         internal static ManualLogSource StaticLogger;
 
@@ -68,6 +68,11 @@ namespace PhValheimCompanion
             // main menu's GameObject, which is destroyed on the way into a world. See JoinSentry
             // for why that matters -- it is the difference between a disconnect and a failure.
             JoinSentry.Install();
+
+            // Server-side player telemetry (2.58): a MonoBehaviour on this plugin's own
+            // GameObject, so it ticks for the life of the process. It decides per tick
+            // whether it is on a dedicated server (ZNet does not exist yet here).
+            gameObject.AddComponent<PlayerTelemetry>();
 
             Logger.LogMessage($"{AUTHOR}'s {MODNAME} (v{VERSION}) has started");
         }

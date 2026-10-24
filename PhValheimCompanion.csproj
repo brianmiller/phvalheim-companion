@@ -14,7 +14,7 @@
     <AssemblyName>PhValheimCompanion</AssemblyName>
     <RootNamespace>PhValheimCompanion</RootNamespace>
     <Authors>posixone</Authors>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Description>Connects PhValheim client and server events to the PhValheim backend</Description>
     <LangVersion>8.0</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -44,6 +44,7 @@
     <Compile Include="ModListView.cs" />
     <Compile Include="ConnectFlow.cs" />
     <Compile Include="JoinSentry.cs" />
+    <Compile Include="PlayerTelemetry.cs" />
     <Compile Include="Patches/FejdStartupPatch.cs" />
     <Compile Include="Properties/AssemblyInfo.cs" />
   </ItemGroup>

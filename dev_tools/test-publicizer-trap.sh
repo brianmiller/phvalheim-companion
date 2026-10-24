@@ -117,6 +117,9 @@ PlayFabMatchmakingServerData.serverName
 ZNet.get_instance
 ZNet.IsServer
 ZNet.IsDedicated
+ZNet.GetPlayerList
+ZNet+PlayerInfo.m_name
+ZNet+PlayerInfo.m_characterID
 WorldGenerator.get_instance
 World.m_name
 ItemStand.m_supportedItems
