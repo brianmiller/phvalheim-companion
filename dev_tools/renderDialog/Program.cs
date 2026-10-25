@@ -144,6 +144,22 @@ namespace RenderDialog
                 world: "JustStarted", crossplay: true, vanilla: false, joinCode: "",
                 mods: new List<string> { "CustomSeed" });
 
+            failures += Render(build, parse, "LIVE REFRESH, WAITING FOR CODE",
+                world: "RefreshFixture", crossplay: true, vanilla: false, joinCode: "",
+                mods: new List<string> { "CustomSeed" }, refreshToken: "fixture-token");
+            failures += Render(build, parse, "LIVE REFRESH, CODE AVAILABLE",
+                world: "RefreshFixture", crossplay: true, vanilla: false, joinCode: "123456",
+                mods: new List<string> { "CustomSeed" }, refreshToken: "fixture-token");
+            var refreshBody = "launch?RefreshFixture??example.com?25000?example.com?https?0?1??fixture-token";
+            var refreshPayload = parse.Invoke(null, new object[] { new[] { "valheim", "--phvalheim-launch", Convert.ToBase64String(Encoding.UTF8.GetBytes(refreshBody)) } });
+            var apply = payloadType.GetMethod("ApplyConnectionState", BindingFlags.Instance | BindingFlags.NonPublic);
+            bool refreshed = (bool)apply.Invoke(refreshPayload, new object[] { "world=RefreshFixture\nmode=running\ncrossplay=1\njoinCode=123456\nport=25001\nmods=fixturehash\n" });
+            if (!refreshed || (string)payloadType.GetProperty("JoinCode").GetValue(refreshPayload) != "123456") { Console.WriteLine("FAIL late code did not become available"); failures++; }
+            bool wrongWorld = (bool)apply.Invoke(refreshPayload, new object[] { "world=OtherWorld\nmode=running\njoinCode=999999\n" });
+            if (wrongWorld || (string)payloadType.GetProperty("JoinCode").GetValue(refreshPayload) != "123456") { Console.WriteLine("FAIL wrong-world data was accepted"); failures++; }
+            apply.Invoke(refreshPayload, new object[] { "world=RefreshFixture\nmode=stopped\ncrossplay=1\njoinCode=\n" });
+            if ((string)payloadType.GetProperty("JoinCode").GetValue(refreshPayload) != "") { Console.WriteLine("FAIL stale code survived a stop"); failures++; }
+
             failures += Render(build, parse, "MODDED WORLD, NO MODS FOUND (sync failed)",
                 world: "BrokenSync", crossplay: false, vanilla: false, joinCode: "",
                 mods: new List<string>());
@@ -269,7 +285,7 @@ namespace RenderDialog
         }
 
         private static int Render(MethodInfo build, MethodInfo parse, string label,
-            string world, bool crossplay, bool vanilla, string joinCode, List<string> mods)
+            string world, bool crossplay, bool vanilla, string joinCode, List<string> mods, string refreshToken = "")
         {
             // Field order is fixed by the server's phvBuildLaunchString() and pinned by
             // dev_tools/test-launch-payload-contract.sh:
@@ -278,7 +294,7 @@ namespace RenderDialog
             string[] fields =
             {
                 "launch", world, "", "valheim.example.com", "25000", "phv.example.com",
-                "https", vanilla ? "1" : "0", crossplay ? "1" : "0", joinCode,
+                "https", vanilla ? "1" : "0", crossplay ? "1" : "0", joinCode, refreshToken,
             };
 
             // '?' is the separator, not '|'. Getting this wrong produced a one-field split, the

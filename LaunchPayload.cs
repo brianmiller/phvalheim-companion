@@ -41,6 +41,25 @@ namespace PhValheimCompanion
         public bool IsVanilla { get; private set; }
         public bool IsCrossplay { get; private set; }
         public string JoinCode { get; private set; }
+        public string RefreshToken { get; private set; }
+        public string ConnectionStatus { get; internal set; } = "Checking backend…";
+        public string ServerMode { get; private set; }
+        public string PayloadHash { get; private set; }
+        internal bool ApplyConnectionState(string response)
+        {
+            var fields = new Dictionary<string, string>();
+            foreach (var line in (response ?? "").Split('\n')) { int i=line.IndexOf('='); if(i>0) fields[line.Substring(0,i)]=line.Substring(i+1).TrimEnd('\r'); }
+            if (!fields.TryGetValue("world", out var world) || world != World || !fields.TryGetValue("mode", out var mode)) return false;
+            ServerMode=mode;
+            if(fields.TryGetValue("crossplay",out var crossplay)) IsCrossplay=crossplay=="1";
+            if(fields.TryGetValue("joinCode",out var code)) JoinCode=code;
+            if(fields.TryGetValue("port",out var port) && ushort.TryParse(port,out var n) && n>0) Port=port;
+            if(fields.TryGetValue("mods",out var hash)) PayloadHash=hash;
+            ConnectionStatus = mode != "running" ? "Server " + mode + " · checking again in 5s"
+                : CrossplayCodeNotReady ? "Backend connected · waiting for join code"
+                : "Ready · connection data refreshed " + DateTime.Now.ToString("HH:mm:ss");
+            return true;
+        }
 
         // How this world will actually be joined.
         //
@@ -146,7 +165,8 @@ namespace PhValheimCompanion
                 HttpScheme = f[6],
                 IsVanilla = f.Length >= 8 && f[7] == "1",
                 IsCrossplay = f.Length >= 9 && f[8] == "1",
-                JoinCode = f.Length >= 10 ? f[9] : ""
+                JoinCode = f.Length >= 10 ? f[9] : "",
+                RefreshToken = f.Length >= 11 ? f[10] : ""
             };
 
             Main.StaticLogger.LogMessage($"PhValheim launch payload: world=\"{p.World}\" host={p.Host}:{p.Port} vanilla={p.IsVanilla} crossplay={p.IsCrossplay} joinCode={(string.IsNullOrEmpty(p.JoinCode) ? "(none)" : "present")}");

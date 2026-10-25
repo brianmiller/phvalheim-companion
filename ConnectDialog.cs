@@ -289,6 +289,7 @@ namespace PhValheimCompanion
         // and the list shows them; when it does not, the names stay inline. The dialog has to
         // work either way, so this is read, never assumed.
         private bool _modListBuilt;
+        private readonly ConnectionRefresh _connectionRefresh = new ConnectionRefresh();
 
         private void Update()
         {
@@ -312,6 +313,15 @@ namespace PhValheimCompanion
                     _closedByPlayer = false;
                 }
                 return;
+            }
+
+            if (IsMainMenuActive() && _connectionRefresh.Tick(LaunchPayload.Current) && _shown && !_closedByPlayer)
+            {
+                var popup = PopupInstance();
+                // Never overwrite a password prompt or another mod's popup.
+                if (popup != null && Utils.TryGetFieldValue(popup, "headerText", out var h) && h is TMP_Text header
+                    && header.text == "PhValheim" && Utils.TryGetFieldValue(popup, "bodyText", out var b) && b is TMP_Text body)
+                    body.text = BuildBodyText(LaunchPayload.Current, LaunchPayload.InstalledPlugins(), _modListBuilt);
             }
 
             // THE WAY BACK THAT NEEDS NO BUTTON.
@@ -797,6 +807,15 @@ namespace PhValheimCompanion
 
         private void OnConnect()
         {
+            var payload = LaunchPayload.Current;
+            if (payload != null && !string.IsNullOrEmpty(payload.RefreshToken) && payload.CrossplayCodeNotReady)
+            {
+                payload.ConnectionStatus = "Waiting for crossplay code · no restart needed";
+                var popup = PopupInstance();
+                if (popup != null && Utils.TryGetFieldValue(popup, "bodyText", out var b) && b is TMP_Text body)
+                    body.text = BuildBodyText(payload, LaunchPayload.InstalledPlugins(), _modListBuilt);
+                return;
+            }
             Pop();
             ModListView.Destroy();
             RestorePopupSkin();
@@ -1482,9 +1501,12 @@ namespace PhValheimCompanion
                         // Honest about the fallback rather than describing this as a plain
                         // address world. The code usually appears within ~30s of the world
                         // starting, so the second line is real advice, not filler.
-                        Row(sb, "Joining", "<color=" + ColHighlight + ">" + Escape(payload.Host)
-                            + ':' + Escape(payload.Port) + "</color>");
-                        Row(sb, "", "<color=" + ColWarn + ">crossplay code not published yet</color>");
+                        if (!string.IsNullOrEmpty(payload.RefreshToken))
+                            Row(sb, "Joining", "<color=" + ColWarn + ">waiting for crossplay code · keep game open</color>");
+                        else {
+                            Row(sb, "Joining", "<color=" + ColHighlight + ">" + Escape(payload.Host) + ':' + Escape(payload.Port) + "</color>");
+                            Row(sb, "", "<color=" + ColWarn + ">crossplay code not published yet</color>");
+                        }
                     }
                     else
                     {
@@ -1494,7 +1516,9 @@ namespace PhValheimCompanion
                     break;
             }
 
-            AppendModsRow(sb, payload, mods, listIsSeparate);
+            bool liveRefresh = !string.IsNullOrEmpty(payload.RefreshToken);
+            if (liveRefresh) Row(sb, "Backend", "<size=85%>" + Escape(payload.ConnectionStatus) + "</size>");
+            if (!liveRefresh || !listIsSeparate) AppendModsRow(sb, payload, mods, listIsSeparate);
 
             // One line, and short enough not to wrap at this width. The old two-sentence
             // version wrapped to two lines and was the part that ended up under the buttons.
@@ -1502,7 +1526,7 @@ namespace PhValheimCompanion
             // the top ~62% of the rect in that mode, and this line is precisely what the
             // overlapping screenshot showed the mod list being drawn straight through. The
             // Connect button directly below says the same thing well enough.
-            if (!listIsSeparate)
+            if (!listIsSeparate && !liveRefresh)
             {
                 sb.Append('\n');
                 sb.Append("<size=92%><color=").Append(ColMuted)
