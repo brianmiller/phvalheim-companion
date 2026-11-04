@@ -53,6 +53,8 @@ attribute and never in `Awake()`.
 
 ## Building
 
+Contributing a change? [`CONTRIBUTING.md`](CONTRIBUTING.md) is the short, complete procedure.
+
 ```bash
 ./refresh-libs.sh                      # populate ./libs from a Valheim install
 dotnet build PhValheimCompanion.csproj  # -> bin/Release/net472/PhValheimCompanion.dll
