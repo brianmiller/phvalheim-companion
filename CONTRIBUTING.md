@@ -1,13 +1,13 @@
 # Contributing to PhValheim Companion
 
-Thanks for helping. This is the only page you need to read to contribute. It is written for
+Thanks for helping. Start here to choose the setup and checks for your change. It is written for
 people and for AI coding assistants alike. If something here is wrong or missing, fixing this
 page is itself a welcome contribution.
 
 ## The 30-second version
 
 1. Fork the repo and branch from `main`.
-2. Fill `libs/` with `./refresh-libs.sh`, then `dotnet build -c Release`.
+2. For plugin code, prepare your own game references as described below, then build. Docs-only changes do not need game references.
 3. Make one change. Run `dev_tools/test-*.sh`. Load the DLL in a real game and try it.
 4. Open a pull request. Fill in the checklist the template gives you.
 5. The maintainer reviews, merges, and bundles the new DLL into the next server release.
@@ -31,18 +31,31 @@ installs it into every world. The README explains what it does and how side dete
 
 ## Set up
 
-You need the .NET SDK (8 or newer), `git`, and a copy of Valheim's assemblies.
+You need the .NET SDK (8 or newer), the .NET 8 runtime for the test harnesses, Git and Bash. Building the plugin also requires references from your own modded Valheim installation.
 
 ```bash
 git clone git@github.com:<you>/phvalheim-companion.git
 cd phvalheim-companion
-./refresh-libs.sh                 # fills libs/ from a Valheim install or a running phvalheim-server
+PHVALHEIM_REFS_DIR=/path/to/prepared-references ./refresh-libs.sh
 dotnet build -c Release           # -> bin/Release/net472/PhValheimCompanion.dll
 ```
 
 `libs/` is gitignored and must stay that way. It holds Iron Gate's and Unity's assemblies,
-which are not ours to redistribute. `refresh-libs.sh` explains where it looks and why the
-publicized assembly is a separate step.
+which are not ours to redistribute. `refresh-libs.sh` lists every required file and fails with the missing filenames.
+It copies prepared references; it does not extract them from Docker or publicize them.
+Prepare `assembly_valheim_publicized.dll` from your own matching `assembly_valheim.dll`
+with your chosen assembly publicizer. Keep the original assembly separately for
+`PHVALHEIM_REALREFS`, which the publicizer-trap test uses. Do not obtain these files from
+an unverified download or commit them.
+
+The decision and dialog tests run outside the game, but load the built plugin and
+its reference assemblies. They still require a successful plugin build; there is no
+reference-free runtime test path. Docs-only contributors can check links and commands
+without building the plugin.
+
+For full plugin validation, set `PHVALHEIM_REALREFS` to a directory with the original
+`assembly_valheim.dll` and the supporting reference DLLs, then build and run the full suite.
+Missing references or a skipped reachability check mean **unverified**, not a passing plugin build.
 
 ## Where things live
 
@@ -73,8 +86,10 @@ publicized assembly is a separate step.
 
 ## Test it
 
+For docs-only changes, verify links and any changed commands. No new runtime test or game install is required. For code changes, run the checks below and record unavailable checks explicitly.
+
 ```bash
-for t in dev_tools/test-*.sh; do bash "$t" || echo "FAIL $t"; done
+bash dev_tools/run-tests.sh
 ```
 
 The tests cover the join-outcome decision, the dialog layout and reachability, and the
@@ -82,7 +97,7 @@ publicizer trap. **None of them run the game.** For anything that touches the jo
 or telemetry, drop the built DLL into `BepInEx/plugins/PhValheimCompanion/` of a real client and
 a real server, try it, and say in the PR what you saw. If you could not, say that instead.
 
-Add a test for your change as `dev_tools/test-<what-it-checks>.sh`:
+For behavior changes, add a test as `dev_tools/test-<what-it-checks>.sh`:
 
 - **It must be able to fail.** Break the code on purpose, watch the test go red, then fix it.
 - **Assert on the outcome**, not on a summary line.
@@ -95,10 +110,12 @@ The PR template is the checklist. In short:
 
 - [ ] One change, described in plain words: what changes for a player or a server.
 - [ ] `dotnet build -c Release` succeeds and every `dev_tools/test-*.sh` passes.
-- [ ] A test that fails without the change.
+- [ ] For behavior changes, a test that fails without the change. For docs-only changes, check links and commands; no new runtime test is required.
 - [ ] New source files are in the csproj.
 - [ ] No version bump. Nothing from `libs/` committed.
 - [ ] What you ran in a real game, on which side. Or "nothing", plainly.
+
+Report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md), before opening a public issue or PR.
 
 ## Rules that protect everyone
 

@@ -31,7 +31,7 @@ covers what it does and how side detection works.
 ## Tests
 
 ```bash
-for t in dev_tools/test-*.sh; do bash "$t" || echo "FAIL $t"; done
+bash dev_tools/run-tests.sh
 ```
 
 None of them run the game. Say so when you hand over anything touching the join flow, the UI
