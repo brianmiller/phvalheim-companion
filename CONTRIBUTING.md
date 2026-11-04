@@ -108,6 +108,58 @@ Missing references or a skipped reachability check mean **unverified**, not a pa
   member compiles clean and throws the first time a player clicks. `test-publicizer-trap.sh`
   catches it, but only if you run it.
 
+## Track work in GitHub Issues
+
+**GitHub Issues is the single source of truth for bugs, planned work, ownership,
+acceptance criteria, and completion status.** Use [this repository's issues](https://github.com/brianmiller/phvalheim-companion/issues),
+and link issues in other repositories when the change crosses boundaries. Search
+existing issues before opening a new one; do not duplicate a closed request when a
+linked follow-up already tracks the remaining work.
+
+Every contribution must review affected issues and link them in its PR. Record
+scope, acceptance criteria, validation evidence, and remaining work there. Keep
+implementation details and review evidence in the PR and link back to the issue.
+Do not maintain a parallel task/status list in `BACKLOG.md` or another Markdown file.
+Repository documentation describes architecture, setup, and supported behavior;
+historical release/validation records remain evidence, not a current work queue.
+
+An issue being closed or a PR being merged does not mean a release or deployment
+occurred. State those separately with evidence. Public tracking must not disclose
+vulnerabilities; use [SECURITY.md](SECURITY.md) for private reporting. Issue review
+is not permission to close issues, publish, deploy, or merge without authorization.
+
+## Always review dynamic pages and status content
+
+**Every contribution must review dynamic pages and maintained status content for
+needed changes, including code-only and docs-only PRs.** Review is mandatory;
+editing an unaffected page is not. Do not skip this step because the feature works,
+CI is green, or a page fetches data automatically.
+
+Review the [server website and landing page](https://github.com/brianmiller/phvalheim-server/tree/master/website/docs),
+player-portal and admin guidance, client download/install pages (including dynamic
+links and static fallbacks), README/version references, contributor guides, and
+[GitHub Issues](https://github.com/brianmiller/phvalheim-companion/issues)
+for work status. Check other repository guides when the change crosses
+repository boundaries. Check both the content source and the displayed behavior
+when a dynamic page's output could change.
+
+- Update affected content with the change. For another repository, prepare a linked
+  documentation PR or identify the required follow-up and owner for Brian's review;
+  do not silently leave it stale or claim it was updated.
+- Record which pages/files were reviewed, which were updated, and a concrete reason
+  for each applicable area that needs no update. Report unavailable checks as
+  unverified. A blanket "N/A" without an explanation is not sufficient.
+- Keep **implemented**, **merged**, **released**, and **deployed** distinct. Never
+  advertise unreleased work as available or mark an issue complete before its
+  acceptance criteria are met. Keep published instructions accurate for the released
+  behavior; clearly label future behavior and record release-time follow-ups for
+  Brian. This review does not authorize version bumps, releases, deployment, or
+  issue closure.
+- A website rebuild publishes the source; it does not rewrite stale descriptions.
+  Dynamic release lookups do not maintain fallback links or issue status. Check
+  links/builds and changed rendered behavior as appropriate, and include the evidence
+  in the PR's documentation/status review.
+
 ## Test it
 
 For docs-only changes, verify links and any changed commands. No new runtime test or game install is required. For code changes, run the checks below and record unavailable checks explicitly.
