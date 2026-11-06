@@ -265,13 +265,9 @@ notcheck PanelTree.LogOnce 'Instantiate' \
 	"a diagnostic that creates objects is a reskin again, and the last one made the dialog unusable"
 
 echo
-echo "== the way back does not depend on a button at all =="
-
-# The reopen button has failed in three forms on Brian's client. This route uses only
-# m_mainMenu's active state -- the same read that already decides whether the dialog may show,
-# which is proven to work because the dialog shows.
-check ConnectDialog.Update 'ConnectDialog._menuWasActive' \
-	"leaving the main menu and returning would not re-offer the notice, so a dead button would again be the only route"
+echo "== returning to the menu does not reopen the dialog =="
+notcheck ConnectDialog.Update 'ConnectDialog._menuWasActive' \
+    "menu navigation must not trigger an unsolicited dialog"
 
 echo
 echo "== the reopen button has more than one way to find a template =="
