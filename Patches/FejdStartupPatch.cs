@@ -51,7 +51,7 @@ namespace PhValheimCompanion.Patches
                 if (__instance.gameObject.GetComponent<ConnectDialog>() == null)
                 {
                     __instance.gameObject.AddComponent<ConnectDialog>();
-                    Main.StaticLogger.LogMessage("PhValheim launch detected; the connect dialog will appear once the main menu is ready.");
+                    Main.StaticLogger.LogMessage("PhValheim launch detected; use the Connect menu entry to open the dialog.");
                 }
             }
         }

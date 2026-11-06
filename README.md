@@ -15,9 +15,12 @@ against a required minimum is gone.
 **Connecting to the world you clicked Launch! on** (client side, 2.53+)
 
 The PhValheim client passes the Launch! link's payload to Valheim as
-`--phvalheim-launch <base64>` on the command line. When that argument is present the Companion
-shows a welcome dialog on the main menu naming the world and the mods installed on *this*
-machine, with **Connect** and **Close**.
+`--phvalheim-launch <base64>` on the command line. In the next server bundle (not yet
+released), that argument makes Companion add **CONNECT: <worldname>** to the main menu.
+Clicking that entry opens a dialog naming
+the world and the mods installed on *this* machine, with **Connect** and **Close**.
+The dialog does not open automatically at startup, after returning from another menu,
+or after a failed join; click the entry again to retry.
 
 Connect hands the join to Valheim's own `ProceedJoinRequest`, which queues the server and
 opens character selection; once a character is chosen Valheim connects on its own, by

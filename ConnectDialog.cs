@@ -75,12 +75,8 @@ namespace PhValheimCompanion
         internal const int FailureLineBudgetChars = 56;
 
         private bool _shown;
-        private bool _closedByPlayer;
-
-        // Whether the main menu was the active screen last frame. Drives the no-button way
-        // back in Update(); see the comment there. Starts true so the frame this component is
-        // attached on -- when the menu is already up -- is not read as a return to it.
-        private bool _menuWasActive = true;
+        // Start with the menu entry; only its click callback may request a dialog.
+        private bool _closedByPlayer = true;
 
         // Saved so they can be put back. yesText and noText live on the UnifiedPopup INSTANCE,
         // not on the popup being pushed, so overwriting them without restoring would relabel
@@ -306,11 +302,9 @@ namespace PhValheimCompanion
 
                 if (ConnectFlow.NoticeMainMenu(IsMainMenuActive()))
                 {
-                    // Offer the dialog again rather than only the reopen button. The player
-                    // asked to join and it did not happen; a second Connect is the most likely
-                    // next move, and a world that was mid-restart often works on the retry.
+                    // Keep the failure for the next click, without interrupting the menu.
                     _shown = false;
-                    _closedByPlayer = false;
+                    _closedByPlayer = true;
                 }
                 return;
             }
@@ -323,31 +317,6 @@ namespace PhValheimCompanion
                     && header.text == "PhValheim" && Utils.TryGetFieldValue(popup, "bodyText", out var b) && b is TMP_Text body)
                     body.text = BuildBodyText(LaunchPayload.Current, LaunchPayload.InstalledPlugins(), _modListBuilt);
             }
-
-            // THE WAY BACK THAT NEEDS NO BUTTON.
-            //
-            // The reopen button has now failed on Brian's client in three different forms: an
-            // IMGUI button that drew and never received a click, and twice a cloned native
-            // button that was never created at all. Every one of those depends on something I
-            // cannot observe from here -- an input path, a raycast, a canvas, a reflected field.
-            //
-            // This depends on none of them. It re-offers the notice when the player LEAVES the
-            // main menu and comes back, using only m_mainMenu's active state, which is already
-            // proven to read correctly on his client: it is the same gate that decides whether
-            // the dialog may show at all, and the dialog demonstrably shows.
-            //
-            // Leaving and returning is a deliberate act, so this cannot pester a player who
-            // just wants the notice gone -- they close it and carry on, and it is only offered
-            // again if they navigate away and back. Still gated by ShowLaunchHelp for the
-            // player who wants it off for good.
-            bool menuActive = IsMainMenuActive();
-            if (menuActive && !_menuWasActive && _closedByPlayer && !ConnectFlow.Connecting)
-            {
-                _closedByPlayer = false;
-                _shown = false;
-                Main.StaticLogger.LogMessage("Back on the main menu after the PhValheim notice was closed -- offering it again.");
-            }
-            _menuWasActive = menuActive;
 
             // THE WAY BACK, handled before the early return below -- that return is taken on
             // exactly the frames when the button should be on screen.
@@ -442,7 +411,7 @@ namespace PhValheimCompanion
         internal static bool WantsReopenButton(bool closedByPlayer, bool shown, bool connecting,
                                                bool popupVisible, bool menuActive)
         {
-            if (!closedByPlayer) return false;   // nothing to reopen
+            if (!closedByPlayer) return false;   // a click is pending or the dialog is open
             if (connecting) return false;        // a join is in flight; the watchdog owns this
             if (popupVisible) return false;      // another dialog is up, ours included
             if (!menuActive) return false;       // not on the main menu
